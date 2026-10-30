@@ -980,6 +980,7 @@ function viewMenu() {
       ${item('data-balita', 'Data balita', 'Daftar, cari, tambah, ubah')}
       ${item('tambah-balita', 'Tambah balita', 'Bayi lahir, pindah datang, baru terdata')}
       ${item('akun', 'Ganti PIN', '')}
+      ${item('', 'Periksa pembaruan', 'Versi ' + esc(C.VERSI) + ' · ketuk untuk memuat versi terbaru', 'cekPembaruan')}
     </div>
     ${admin() ? `<div class="judul-bagian">Admin</div><div class="daftar">
       ${item('dashboard', 'Dashboard desa', 'Rekap dan tren 12 bulan')}
@@ -1314,6 +1315,15 @@ const AKSI = {
     catch (e) { bukaLembar(`<h3>Salin teks</h3><textarea style="min-height:240px">${esc(teks)}</textarea>`); }
   },
   muatUlang: () => render(),
+  cekPembaruan: async () => {
+    if (!S.swReg) { toast('Pembaruan otomatis belum aktif di perangkat ini. Tutup lalu buka lagi aplikasinya.'); return; }
+    if (!navigator.onLine) { toast('Perlu sinyal untuk memeriksa versi baru.'); return; }
+    toast('Memeriksa versi baru…', 2500);
+    try { await S.swReg.update(); } catch (e) { toast('Gagal memeriksa. Coba lagi saat sinyal bagus.'); return; }
+    if (S.swBaru || S.swReg.waiting) { S.swBaru = S.swBaru || S.swReg.waiting; if (!cobaPerbarui()) toast('Versi baru siap. Tutup formulir dulu, lalu coba lagi.'); }
+    else if (S.swReg.installing) toast('Mengunduh versi baru… aplikasi akan dimuat ulang sendiri.', 4500);
+    else toast('Aplikasi sudah versi terbaru (' + C.VERSI + ').');
+  },
   buatLaporan: async el => {
     const p = $('#perLap').value, h = $('#hasilLap');
     el.disabled = true; el.innerHTML = '<span class="spinner"></span> Membuat laporan…';
@@ -1449,13 +1459,31 @@ document.addEventListener('focusout', () => setTimeout(cekKetik, 0));
 if (window.visualViewport) window.visualViewport.addEventListener('resize', cekKetik);
 window.addEventListener('online', () => { S.online = true; perbaruiStatus(); kirimAntrean(); });
 window.addEventListener('offline', () => { S.online = false; perbaruiStatus(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') kirimAntrean(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  kirimAntrean();
+  if (S.swReg) S.swReg.update().catch(() => {}); // aplikasi lama terbuka di latar: periksa versi baru saat dibuka lagi
+});
 setInterval(() => { if (S.antrean.some(o => o.status === 'menunggu')) kirimAntrean(); }, 30000);
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.pasang = e; segarkan(); });
 
+/* Pembaruan aplikasi: versi baru dipasang otomatis saat aman, yaitu tidak ada lembar/dialog terbuka,
+   tidak sedang mengetik atau mengisi formulir halaman, dan tidak sedang mengirim. Paling lambat saat pindah halaman.
+   Antrean data tetap aman di IndexedDB. */
+function cobaPerbarui() {
+  const a = document.activeElement, hal = rute().hal;
+  if (!S.swBaru || S.kirim || document.querySelector('.tirai') || (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) ||
+    ['tambah-balita', 'ubah-balita', 'akun'].indexOf(hal) >= 0) return false;
+  try { sessionStorage.setItem('diperbarui', '1'); } catch (e) { }
+  S.swBaru.postMessage('perbarui');
+  return true;
+}
+window.addEventListener('hashchange', () => setTimeout(cobaPerbarui, 0));
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').then(reg => {
-    const tandai = w => { if (w && navigator.serviceWorker.controller) { S.swBaru = w; segarkan(); } };
+    S.swReg = reg;
+    const tandai = w => { if (w && navigator.serviceWorker.controller) { S.swBaru = w; if (!cobaPerbarui()) segarkan(); } };
     if (reg.waiting) tandai(reg.waiting);
     reg.addEventListener('updatefound', () => {
       const w = reg.installing;
@@ -1478,6 +1506,7 @@ if ('serviceWorker' in navigator) {
   susunData();
   if (!S.sesi && location.hash !== '#/login') location.hash = '#/login';
   render();
+  try { if (sessionStorage.getItem('diperbarui')) { sessionStorage.removeItem('diperbarui'); toast('Aplikasi diperbarui ke versi ' + C.VERSI + '.'); } } catch (e) { }
   if (S.sesi) {
     await kirimAntrean();
     const lama = !S.dasar || Date.now() - (S.dasar.waktuSinkron || 0) > 10 * 60000;

@@ -1,11 +1,12 @@
 /* Service worker: menyimpan file aplikasi di HP agar bisa dibuka tanpa sinyal.
    NAIKKAN VERSI setiap kali ada file yang diubah, supaya HP kader mendapat versi baru. */
-const VERSI = 'pm-v1.2.2';
+const VERSI = 'pm-v1.2.3';
 const FILE = ['./', './index.html', './styles.css', './config.js', './who.js', './gizi.js', './db.js', './app.js',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSI).then(c => c.addAll(FILE)));
+  // cache: 'reload' = ambil langsung dari server, bukan salinan lama di cache browser (GitHub Pages menyimpan 10 menit)
+  e.waitUntil(caches.open(VERSI).then(c => c.addAll(FILE.map(f => new Request(f, { cache: 'reload' })))));
 });
 
 self.addEventListener('activate', e => {
