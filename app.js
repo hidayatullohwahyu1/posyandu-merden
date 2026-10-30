@@ -108,9 +108,32 @@ function toast(pesan, lama = 3200) {
   document.body.appendChild(t); setTimeout(() => t.remove(), lama);
 }
 
-/* ---------- Lembar bawah & dialog ---------- */
+/* ---------- Lembar bawah & dialog ----------
+   Tombol Kembali di HP menutup lembar/dialog yang terbuka lebih dulu, bukan meninggalkan halaman.
+   Semua lapisan berbagi satu entri riwayat {lapis: 1}. */
+const lapisan = [];
+let abaikanPop = false;
+function pasangLapis(tutup) {
+  if (!lapisan.length && !(history.state && history.state.lapis)) history.pushState({ lapis: 1 }, '');
+  lapisan.push(tutup);
+}
+function lepasLapis(tutup, tanpaRiwayat) {
+  const i = lapisan.indexOf(tutup);
+  if (i >= 0) lapisan.splice(i, 1);
+  if (!lapisan.length && !tanpaRiwayat && history.state && history.state.lapis) { abaikanPop = true; history.back(); }
+}
+window.addEventListener('popstate', () => {
+  if (abaikanPop) { abaikanPop = false; return; }
+  const tutup = lapisan.pop();
+  if (!tutup) return;
+  if (lapisan.length) history.pushState({ lapis: 1 }, '');
+  tutup();
+});
+
+function hapusTirai() { const t = $('#tirai'); if (t) t.remove(); }
 function bukaLembar(html, setelah) {
-  tutupLembar();
+  // Lembar diganti lembar lain (mis. hasil -> berikutnya): pakai entri riwayat yang sama
+  if ($('#tirai')) hapusTirai(); else pasangLapis(hapusTirai);
   const t = document.createElement('div');
   t.className = 'tirai'; t.id = 'tirai';
   t.innerHTML = `<div class="lembar" role="dialog" aria-modal="true"><div class="pegangan"></div>${html}</div>`;
@@ -119,15 +142,17 @@ function bukaLembar(html, setelah) {
   if (setelah) setelah(t.firstElementChild);
   return t.firstElementChild;
 }
-function tutupLembar() { const t = $('#tirai'); if (t) t.remove(); }
+function tutupLembar(tanpaRiwayat) { if (!$('#tirai')) return; hapusTirai(); lepasLapis(hapusTirai, tanpaRiwayat); }
 function konfirmasi(judul, isi, ya = 'Ya', bahaya = false) {
   return new Promise(ok => {
     const t = document.createElement('div');
     t.className = 'tirai tengah';
     t.innerHTML = `<div class="dialog"><h3 style="margin:0 0 8px">${esc(judul)}</h3><div class="redup" style="margin-bottom:18px">${isi}</div>
       <div class="deret-tombol"><button class="tombol garis" data-j="0">Batal</button><button class="tombol ${bahaya ? 'bahaya' : ''}" data-j="1">${esc(ya)}</button></div></div>`;
-    t.addEventListener('click', e => { const b = e.target.closest('[data-j]'); if (b || e.target === t) { t.remove(); ok(b && b.dataset.j === '1'); } });
+    const batal = () => { t.remove(); ok(false); };
+    t.addEventListener('click', e => { const b = e.target.closest('[data-j]'); if (b || e.target === t) { t.remove(); lepasLapis(batal); ok(b && b.dataset.j === '1'); } });
     document.body.appendChild(t);
+    pasangLapis(batal);
   });
 }
 
@@ -449,7 +474,9 @@ const NAV = [['beranda', 'Beranda', 'rumah'], ['imunisasi', 'Imunisasi', 'suntik
 
 function rute() { const h = (location.hash || '#/beranda').slice(2).split('/'); return { hal: h[0] || 'beranda', arg: decodeURIComponent(h[1] || '') }; }
 
-function render() {
+/* y = posisi gulir yang dipulihkan setelah layar digambar ulang (bawaan: posisi sekarang),
+   supaya sinkron di latar atau menutup lembar tidak melempar daftar kembali ke atas. */
+function render(y = window.scrollY) {
   const app = $('#app'), r = rute();
   if (!S.sesi) { app.innerHTML = viewLogin(); return; }
   if (!S.d) {
@@ -461,6 +488,9 @@ function render() {
   const V = VIEWS[r.hal] || VIEWS.beranda;
   const v = V(r.arg);
   const utama = NAV.some(n => n[0] === r.hal);
+  // Halaman turunan (profil, form, dll.) tetap menyorot tab asal, agar sorotan tidak melompat
+  if (utama) S.tabNav = r.hal;
+  const navAktif = utama ? r.hal : (S.tabNav || v.nav);
   const jmlRisiko = (() => { try { return daftarRisiko().Merah.filter(x => !x.t || x.t.Status === 'Belum').length; } catch (e) { return 0; } })();
   app.innerHTML = `
     ${v.hero ? '<div class="beranda-latar"></div>' : ''}
@@ -470,10 +500,16 @@ function render() {
       <button id="statusKirim" class="status-kirim" data-aksi="ke" data-ke="antrean"></button>
     </header>
     <main>${v.html}</main>
-    <nav class="bawah">${NAV.map(n => `<button class="${(r.hal === n[0] || (v.nav === n[0])) ? 'aktif' : ''}${n[0] === 'ukur' ? ' tengah' : ''}" data-aksi="ke" data-ke="${n[0]}">${n[0] === 'ukur' ? `<span class="fab">${ikon(n[2], 26)}</span>` : ikon(n[2], 23)}<span>${n[1]}</span>
+    <nav class="bawah">${NAV.map(n => `<button class="${navAktif === n[0] ? 'aktif' : ''}${n[0] === 'ukur' ? ' tengah' : ''}" data-aksi="ke" data-ke="${n[0]}"${navAktif === n[0] ? ' aria-current="page"' : ''}>${n[0] === 'ukur' ? `<span class="fab">${ikon(n[2], 26)}</span>` : `<span class="ik">${ikon(n[2], 23)}</span>`}<span>${n[1]}</span>
       ${n[0] === 'risiko' && jmlRisiko ? `<span class="bdg">${jmlRisiko}</span>` : ''}</button>`).join('')}</nav>`;
   perbaruiStatus();
   if (v.setelah) v.setelah();
+  gulirKe(y);
+}
+/* Daftar balita diisi sesudah render (async); bila halaman sempat terlalu pendek, ulangi sekali */
+function gulirKe(y) {
+  window.scrollTo(0, y);
+  if (y) setTimeout(() => { if (window.scrollY < y - 2) window.scrollTo(0, y); }, 40);
 }
 
 /* Perbarui layar tanpa mengganggu kader yang sedang mengetik */
@@ -670,15 +706,15 @@ function formUkur(id, periode) {
     <form id="fUkur" data-id="${esc(id)}" data-periode="${periode}" data-ada="${u ? 1 : 0}" data-base="${u ? esc(u.diubahPada || '') : ''}">
       <label class="isian"><span>Tanggal ukur</span><input type="date" name="tglUkur" value="${tglDefault}" min="${awalPeriode(periode)}" max="${maxTgl}" required ${dis}></label>
       <div class="grid2">
-        <label class="isian"><span>Berat badan</span><div class="isian-angka"><input name="bb" inputmode="decimal" value="${u ? esc(angka(u.bb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>kg</em></div>${hint('bb', 'kg')}</label>
-        <label class="isian"><span>${usia < 24 ? 'Panjang' : 'Tinggi'} badan</span><div class="isian-angka"><input name="tb" inputmode="decimal" value="${u ? esc(angka(u.tb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('tb', 'cm')}</label>
+        <label class="isian"><span>Berat badan</span><div class="isian-angka"><input name="bb" inputmode="decimal" enterkeyhint="next" value="${u ? esc(angka(u.bb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>kg</em></div>${hint('bb', 'kg')}</label>
+        <label class="isian"><span>${usia < 24 ? 'Panjang' : 'Tinggi'} badan</span><div class="isian-angka"><input name="tb" inputmode="decimal" enterkeyhint="next" value="${u ? esc(angka(u.tb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('tb', 'cm')}</label>
       </div>
       <label class="isian"><span>Cara ukur panjang/tinggi</span><select name="cara" ${dis}>
         <option value="Berbaring" ${cara === 'Berbaring' ? 'selected' : ''}>Berbaring (anjuran usia &lt; 2 tahun)</option>
         <option value="Berdiri" ${cara === 'Berdiri' ? 'selected' : ''}>Berdiri (anjuran usia ≥ 2 tahun)</option></select></label>
       <div class="grid2">
-        <label class="isian"><span>Lingkar lengan (LiLA)</span><div class="isian-angka"><input name="lila" inputmode="decimal" value="${u ? esc(angka(u.lila).replace('–', '')) : ''}" placeholder="${usia < 6 ? '≥ 6 bln' : '0,0'}" ${dis}><em>cm</em></div>${hint('lila', 'cm')}</label>
-        <label class="isian"><span>Lingkar kepala</span><div class="isian-angka"><input name="lk" inputmode="decimal" value="${u ? esc(angka(u.lk).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lk', 'cm')}</label>
+        <label class="isian"><span>Lingkar lengan (LiLA)</span><div class="isian-angka"><input name="lila" inputmode="decimal" enterkeyhint="next" value="${u ? esc(angka(u.lila).replace('–', '')) : ''}" placeholder="${usia < 6 ? '≥ 6 bln' : '0,0'}" ${dis}><em>cm</em></div>${hint('lila', 'cm')}</label>
+        <label class="isian"><span>Lingkar kepala</span><div class="isian-angka"><input name="lk" inputmode="decimal" enterkeyhint="done" value="${u ? esc(angka(u.lk).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lk', 'cm')}</label>
       </div>
       <div id="galatUkur"></div>
       ${boleh.ok ? `<button class="tombol penuh" type="submit">${u ? 'Perbarui' : 'Simpan'}</button>
@@ -810,24 +846,24 @@ function grafikKMS(b, ind) {
   for (let m = x0; m <= x1; m++) { const l = lms(m); zs.forEach((z, i) => kurva[i].push({ x: m, y: _nilaiSD(l[0], l[1], l[2], z) })); }
   let y0 = Math.min(kurva[0][0].y, ...titik.map(p => p.y)), y1 = Math.max(kurva[4][kurva[4].length - 1].y, ...titik.map(p => p.y));
   const pad = (y1 - y0) * 0.06; y0 = Math.floor(y0 - pad); y1 = Math.ceil(y1 + pad);
-  const W = 640, H = 340, L = 44, R = 14, A = 12, B = 34;
+  const W = 640, H = 380, L = 56, R = 14, A = 24, B = 46;
   const X = v => L + (v - x0) / (x1 - x0) * (W - L - R), Y = v => A + (1 - (v - y0) / (y1 - y0)) * (H - A - B);
   const garis = pts => pts.map((p, i) => (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1)).join('');
   const area = (atas, bawah) => garis(atas) + bawah.slice().reverse().map(p => 'L' + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1)).join('') + 'Z';
   const langkahX = (x1 - x0) > 30 ? 6 : 3, langkahY = (y1 - y0) > 40 ? 10 : (y1 - y0) > 16 ? 5 : (y1 - y0) > 8 ? 2 : 1;
   let sumbu = '';
-  for (let m = Math.ceil(x0 / langkahX) * langkahX; m <= x1; m += langkahX) sumbu += `<line x1="${X(m)}" x2="${X(m)}" y1="${A}" y2="${H - B}" stroke="#e6ece9"/><text x="${X(m)}" y="${H - B + 18}" text-anchor="middle" font-size="12" fill="#56625e">${m}</text>`;
-  for (let v = Math.ceil(y0 / langkahY) * langkahY; v <= y1; v += langkahY) sumbu += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#e6ece9"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="12" fill="#56625e">${v}</text>`;
+  for (let m = Math.ceil(x0 / langkahX) * langkahX; m <= x1; m += langkahX) sumbu += `<line x1="${X(m)}" x2="${X(m)}" y1="${A}" y2="${H - B}" stroke="#e6ece9"/><text x="${X(m)}" y="${H - B + 26}" text-anchor="middle" font-size="21" fill="#56625e">${m}</text>`;
+  for (let v = Math.ceil(y0 / langkahY) * langkahY; v <= y1; v += langkahY) sumbu += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#e6ece9"/><text x="${L - 8}" y="${Y(v) + 7}" text-anchor="end" font-size="21" fill="#56625e">${v}</text>`;
   const sat = ind === 'bbu' ? 'kg' : 'cm';
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Grafik pertumbuhan">
     ${sumbu}
     <path d="${area(kurva[1], kurva[0])}" fill="#fde8e6"/>
     <path d="${area(kurva[3], kurva[1])}" fill="#e3f4e7"/>
-    ${kurva.map((k, i) => `<path d="${garis(k)}" fill="none" stroke="${i === 2 ? '#1e7a3c' : i === 1 || i === 3 ? '#e0a100' : '#b42318'}" stroke-width="${i === 2 ? 2.2 : 1.3}" ${i === 0 || i === 4 ? 'stroke-dasharray="4 3"' : ''}/>`).join('')}
-    <path d="${garis(titik)}" fill="none" stroke="#1468e5" stroke-width="2.4"/>
-    ${titik.map(p => `<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="4.5" fill="#1468e5" stroke="#fff" stroke-width="1.5"/>`).join('')}
-    <text x="${W - R}" y="${H - 4}" text-anchor="end" font-size="12" fill="#56625e">usia (bulan)</text>
-    <text x="4" y="12" font-size="12" fill="#56625e">${sat}</text>
+    ${kurva.map((k, i) => `<path d="${garis(k)}" fill="none" stroke="${i === 2 ? '#1e7a3c' : i === 1 || i === 3 ? '#e0a100' : '#b42318'}" stroke-width="${i === 2 ? 2.8 : 1.8}" ${i === 0 || i === 4 ? 'stroke-dasharray="4 3"' : ''}/>`).join('')}
+    <path d="${garis(titik)}" fill="none" stroke="#1468e5" stroke-width="3"/>
+    ${titik.map(p => `<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="6.5" fill="#1468e5" stroke="#fff" stroke-width="2"/>`).join('')}
+    <text x="${W - R}" y="${H - 2}" text-anchor="end" font-size="19" fill="#56625e">usia (bulan)</text>
+    <text x="4" y="18" font-size="19" fill="#56625e">${sat}</text>
   </svg>`;
 }
 
@@ -921,7 +957,7 @@ function viewRisiko() {
   const item = (x, absen) => `<button class="item" data-aksi="${absen ? 'ke' : 'formTL'}" data-id="${esc(x.b.id)}" data-ke="balita/${esc(x.b.id)}">
     <span class="avatar ${x.b.jk}">${esc(inisial(x.b.nama))}</span>
     <span class="isi"><div class="nama">${esc(x.b.nama)}</div>
-      <div class="sub">${absen ? 'Terakhir ditimbang ' + namaPeriode(x.u.periode) : esc(x.u.alasan)}</div>
+      <div class="sub${absen ? '' : ' dua'}">${absen ? 'Terakhir ditimbang ' + namaPeriode(x.u.periode) : esc(x.u.alasan)}</div>
       <div class="sub">Ibu ${esc(x.b.ibu || '–')} · ${rtRw(x.b)}${admin() && !S.pos ? ' · ' + esc(x.b.posyandu) : ''}${x.skor ? ' · skor ' + x.skor : ''}</div></span>
     ${absen ? ikon('kanan', 18) : `<span class="lbl ${!x.t ? 'Abu' : x.t.Status === 'Belum' ? 'Merah' : x.t.Status === 'Sedang' ? 'Biru' : 'Hijau'}">${x.t ? esc(x.t.Status) : 'Belum'}</span>`}</button>`;
   const bagian = (judul, l, absen) => `<div class="judul-bagian">${judul} (${l.length})</div>` + (l.length ? `<div class="daftar">${l.map(x => item(x, absen)).join('')}</div>` : '<div class="kosong" style="padding:14px">Tidak ada.</div>');
@@ -976,16 +1012,16 @@ function viewDataBalita() {
   const filter = admin() ? ['Aktif', 'Menunggu', 'Keluar'] : ['Aktif', 'Menunggu'];
   return { judul: 'Data balita', nav: 'menu', html: `
     ${admin() ? pilihPosyandu() : ''}
-    <div class="cari">${ikon('cari', 20)}<input id="cariB" type="search" placeholder="Cari nama, nama ibu, atau NIK" value="${esc(S.cari)}"></div>
+    <div class="cari">${ikon('cari', 20)}<input id="cariB" type="search" placeholder="Cari nama, nama ibu, atau NIK" value="${esc(S.cariB || '')}" autocomplete="off"></div>
     <div class="chips">${filter.map(f => `<button class="chip ${S.filterBalita === f ? 'aktif' : ''}" data-aksi="filterBalita" data-f="${f}">${f}</button>`).join('')}</div>
     <button class="tombol garis penuh" data-aksi="ke" data-ke="tambah-balita" style="margin-bottom:10px">${ikon('tambah', 20)} Tambah balita</button>
     <div id="daftarB"></div>`,
-    setelah: () => { isiDataBalita(); const c = $('#cariB'); c.addEventListener('input', () => { S.cari = c.value; isiDataBalita(); }); } };
+    setelah: () => { isiDataBalita(); const c = $('#cariB'); c.addEventListener('input', () => { S.cariB = c.value; isiDataBalita(); }); } };
 }
 async function isiDataBalita() {
   const el = $('#daftarB'); if (!el) return;
   let l = S.d.balita.filter(b => posTerpilih(b) && (S.filterBalita === 'Keluar' ? ['Lulus', 'Pindah', 'Meninggal', 'Ditolak'].indexOf(b.status) >= 0 : b.status === S.filterBalita));
-  l = (await cocokCari(l, S.cari)).sort(urutNama);
+  l = (await cocokCari(l, S.cariB)).sort(urutNama);
   el.innerHTML = `<p class="redup kecil" style="margin:0 4px 8px">${l.length} balita</p>` + (l.length ? `<div class="daftar">${l.slice(0, 400).map(b => `<button class="item" data-aksi="ke" data-ke="balita/${esc(b.id)}">
     <span class="avatar ${b.jk}">${esc(inisial(b.nama))}</span><span class="isi"><div class="nama">${esc(b.nama)}${b._lokal ? ' ⏳' : ''}</div>
     <div class="sub">${b.tglLahir ? usiaTeks(usiaBulan(b.tglLahir, hariIni())) : 'tgl lahir kosong'} · Ibu ${esc(b.ibu || '–')} · ${rtRw(b)}${admin() && !S.pos ? ' · ' + esc(b.posyandu) : ''}</div></span>
@@ -1102,18 +1138,18 @@ function viewDashboard() {
 }
 
 function grafikTren(tren) {
-  const W = 640, H = 220, L = 40, R = 40, A = 16, B = 30, n = tren.length;
+  const W = 640, H = 280, L = 62, R = 58, A = 18, B = 40, n = tren.length;
   const X = i => L + i * (W - L - R) / (n - 1);
   const maxS = Math.max(10, ...tren.map(t => t.stuntingPersen)) * 1.2;
   const Yds = v => A + (1 - v / 100) * (H - A - B), Yst = v => A + (1 - v / maxS) * (H - A - B);
   const path = (f, k) => tren.map((t, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + f(t[k]).toFixed(1)).join('');
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Tren cakupan penimbangan dan stunting">
-    ${[0, 50, 100].map(v => `<line x1="${L}" x2="${W - R}" y1="${Yds(v)}" y2="${Yds(v)}" stroke="#e6ece9"/><text x="${L - 6}" y="${Yds(v) + 4}" font-size="11" text-anchor="end" fill="#1468e5">${v}%</text>`).join('')}
-    <text x="${W - R + 6}" y="${Yst(0) + 4}" font-size="11" fill="#b42318">0%</text><text x="${W - R + 6}" y="${Yst(maxS / 1.2) + 4}" font-size="11" fill="#b42318">${Math.round(maxS / 1.2)}%</text>
-    <path d="${path(Yds, 'ds')}" fill="none" stroke="#1468e5" stroke-width="2.4"/>
-    <path d="${path(Yst, 'stuntingPersen')}" fill="none" stroke="#b42318" stroke-width="2.4"/>
-    ${tren.map((t, i) => `<circle cx="${X(i)}" cy="${Yds(t.ds)}" r="3.5" fill="#1468e5"/><circle cx="${X(i)}" cy="${Yst(t.stuntingPersen)}" r="3.5" fill="#b42318"/>
-      ${i % 2 === n % 2 ? '' : `<text x="${X(i)}" y="${H - 8}" font-size="11" text-anchor="middle" fill="#56625e">${NAMA_BULAN[+t.periode.slice(5) - 1].slice(0, 3)}</text>`}`).join('')}
+    ${[0, 50, 100].map(v => `<line x1="${L}" x2="${W - R}" y1="${Yds(v)}" y2="${Yds(v)}" stroke="#e6ece9"/><text x="${L - 8}" y="${Yds(v) + 7}" font-size="20" text-anchor="end" fill="#1468e5">${v}%</text>`).join('')}
+    <text x="${W - R + 8}" y="${Yst(0) + 7}" font-size="20" fill="#b42318">0%</text><text x="${W - R + 8}" y="${Yst(maxS / 1.2) + 7}" font-size="20" fill="#b42318">${Math.round(maxS / 1.2)}%</text>
+    <path d="${path(Yds, 'ds')}" fill="none" stroke="#1468e5" stroke-width="3"/>
+    <path d="${path(Yst, 'stuntingPersen')}" fill="none" stroke="#b42318" stroke-width="3"/>
+    ${tren.map((t, i) => `<circle cx="${X(i)}" cy="${Yds(t.ds)}" r="5.5" fill="#1468e5"/><circle cx="${X(i)}" cy="${Yst(t.stuntingPersen)}" r="5.5" fill="#b42318"/>
+      ${i % 2 === n % 2 ? '' : `<text x="${X(i)}" y="${H - 8}" font-size="20" text-anchor="middle" fill="#56625e">${NAMA_BULAN[+t.periode.slice(5) - 1].slice(0, 3)}</text>`}`).join('')}
   </svg><div class="baris kecil" style="gap:16px"><span style="color:#1468e5">● Cakupan ditimbang (D/S)</span><span style="color:#b42318">● Stunting (% dari D)</span></div>`;
 }
 
@@ -1214,8 +1250,14 @@ const VIEWS = {
    AKSI (event delegation)
    ===================================================================== */
 const AKSI = {
-  ke: el => { tutupLembar(); location.hash = '#/' + el.dataset.ke; },
-  kembali: () => { if (history.length > 1) history.back(); else location.hash = '#/beranda'; },
+  ke: el => {
+    // Dari dalam lembar: ganti entri riwayat lembar, agar Kembali tidak membuka halaman yang sama dua kali
+    const dariLembar = lapisan.length && history.state && history.state.lapis;
+    tutupLembar(true); lapisan.length = 0;
+    if (dariLembar) location.replace('#/' + el.dataset.ke); else location.hash = '#/' + el.dataset.ke;
+  },
+  // Dibuka langsung di halaman turunan (tanpa riwayat di aplikasi): kembali ke Beranda, bukan keluar
+  kembali: () => { if (navDalam) history.back(); else location.hash = '#/beranda'; },
   tutup: () => tutupLembar(),
   tutupRender: () => { tutupLembar(); render(); },
   sinkron: async () => { await kirimAntrean(); await sinkron(false); },
@@ -1240,7 +1282,8 @@ const AKSI = {
     tutupLembar(); render(); toast('Pengukuran dihapus.');
   },
   hapusImun: async () => {
-    const f = $('#fImun');
+    const f = $('#fImun'), j = S.d.jadwal.find(x => x.kode === f.dataset.k);
+    if (!await konfirmasi('Hapus imunisasi?', 'Catatan ' + esc(j ? j.nama : f.dataset.k) + ' untuk ' + esc(S.d.byId[f.dataset.id].nama) + ' akan dihapus.', 'Hapus', true)) return;
     await antrekan('hapusImunisasi', { id: f.dataset.id, kode: f.dataset.k }, 'Hapus imunisasi ' + f.dataset.k);
     tutupLembar(); render();
   },
@@ -1359,9 +1402,21 @@ document.addEventListener('click', e => {
   const fn = AKSI[el.dataset.aksi];
   if (fn) { e.preventDefault(); fn(el); }
 });
-document.addEventListener('submit', e => {
-  const fn = KIRIM[e.target.id];
-  if (fn) { e.preventDefault(); fn(e.target); }
+/* Kirim formulir: cegah ketukan ganda (mis. balita tercatat dua kali) dan tunjukkan sedang menyimpan */
+document.addEventListener('submit', async e => {
+  const f = e.target, fn = KIRIM[f.id];
+  if (!fn) return;
+  e.preventDefault();
+  if (f.dataset.sibuk) return;
+  f.dataset.sibuk = '1';
+  const t = f.querySelector('[type=submit]'), teks = t ? t.innerHTML : '';
+  const sibuk = f.id === 'fLogin' || !t ? null : setTimeout(() => { t.innerHTML = '<span class="spinner"></span> Menyimpan…'; }, 300);
+  if (t) t.disabled = true;
+  try { await fn(f); } finally {
+    clearTimeout(sibuk);
+    delete f.dataset.sibuk;
+    if (t && t.isConnected) { t.disabled = false; if (sibuk) t.innerHTML = teks; }
+  }
 });
 document.addEventListener('change', async e => {
   const k = e.target.dataset && e.target.dataset.ubah;
@@ -1374,7 +1429,24 @@ document.addEventListener('change', async e => {
 /* =====================================================================
    MULAI
    ===================================================================== */
-window.addEventListener('hashchange', () => { tutupLembar(); render(); window.scrollTo(0, 0); });
+/* Posisi gulir tiap halaman diingat: tombol Kembali mengembalikan kader ke tempat semula di daftar */
+const gulirHal = {};
+let navDalam = false;
+window.addEventListener('hashchange', e => {
+  navDalam = true;
+  gulirHal[new URL(e.oldURL).hash] = window.scrollY;
+  tutupLembar(true); lapisan.length = 0;
+  render(gulirHal[location.hash] || 0);
+});
+/* Papan ketik terbuka → sembunyikan navigasi bawah (CSS body.ketik) agar tidak naik menutupi isian */
+function cekKetik() {
+  const a = document.activeElement, vv = window.visualViewport;
+  const fokus = a && a.matches && a.matches('textarea, input:not([type=checkbox]):not([type=radio]):not([type=date]):not([type=button]):not([type=submit])');
+  document.body.classList.toggle('ketik', !!fokus && (!vv || vv.height < screen.height * 0.75));
+}
+document.addEventListener('focusin', cekKetik);
+document.addEventListener('focusout', () => setTimeout(cekKetik, 0));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', cekKetik);
 window.addEventListener('online', () => { S.online = true; perbaruiStatus(); kirimAntrean(); });
 window.addEventListener('offline', () => { S.online = false; perbaruiStatus(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') kirimAntrean(); });
