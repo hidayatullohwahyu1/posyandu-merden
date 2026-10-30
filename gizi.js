@@ -174,11 +174,11 @@ function peringatanUkur(d, lalu) {
   var w = [];
   if (!lalu) return w;
   if (+d.bb && +lalu.bb) {
-    if (+lalu.bb - +d.bb > 1) w.push('BB turun lebih dari 1 kg dari bulan lalu (' + lalu.bb + ' kg).');
-    if (+d.bb - +lalu.bb > 2) w.push('BB naik lebih dari 2 kg dari bulan lalu (' + lalu.bb + ' kg).');
+    if (+lalu.bb - +d.bb > 1) w.push('BB turun lebih dari 1 kg dari bulan lalu (' + String(lalu.bb).replace('.', ',') + ' kg).');
+    if (+d.bb - +lalu.bb > 2) w.push('BB naik lebih dari 2 kg dari bulan lalu (' + String(lalu.bb).replace('.', ',') + ' kg).');
   }
-  if (+d.tb && +lalu.tb && +lalu.tb - +d.tb > 1) w.push('Tinggi lebih rendah dari bulan lalu (' + lalu.tb + ' cm).');
-  if (+d.lk && +lalu.lk && Math.abs(+d.lk - +lalu.lk) > 3) w.push('Lingkar kepala berubah lebih dari 3 cm (' + lalu.lk + ' cm).');
+  if (+d.tb && +lalu.tb && +lalu.tb - +d.tb > 1) w.push('Tinggi lebih rendah dari bulan lalu (' + String(lalu.tb).replace('.', ',') + ' cm).');
+  if (+d.lk && +lalu.lk && Math.abs(+d.lk - +lalu.lk) > 3) w.push('Lingkar kepala berubah lebih dari 3 cm (' + String(lalu.lk).replace('.', ',') + ' cm).');
   return w;
 }
 

@@ -20,7 +20,6 @@ const S = {
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const angka = v => (v === '' || v === null || v === undefined) ? '–' : String(v).replace('.', ',');
-const keAngka = v => { const n = parseFloat(String(v || '').replace(',', '.')); return isNaN(n) ? 0 : n; };
 const kosongNull = v => (v === '' || v === undefined) ? null : v;
 function hariIni() { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); }
 const periodeKini = () => hariIni().slice(0, 7);
@@ -31,7 +30,46 @@ function usiaTeks(bln) {
   const t = Math.floor(bln / 12), b = bln % 12;
   return t + ' th' + (b ? ' ' + b + ' bln' : '');
 }
-const inisial = n => String(n || '?').split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join('');
+/* ---------- Penulisan isian sesuai kaidah Indonesia ----------
+   Desimal memakai koma (8,5 kg), nama ditulis HURUF KAPITAL seperti di KK,
+   RT/RW tiga angka (RT/RW 001/002), No HP diawali 08. */
+const rapiSpasi = s => String(s || '').replace(/\s+/g, ' ').trim();
+const rapiNama = s => rapiSpasi(String(s || '').replace(/[‘’`´]/g, "'")).toUpperCase();
+const namaSah = s => /^\p{L}[\p{L} .,'-]*$/u.test(s);
+const rapiRT = s => String(s || '').replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+const rtRw = b => 'RT/RW ' + [b.rt, b.rw].map(v => v ? String(v).padStart(3, '0') : '–').join('/');
+function rapiHP(s) {
+  let n = String(s || '').replace(/[^\d+]/g, '');
+  if (n.indexOf('+62') === 0) n = '0' + n.slice(3);
+  else if (n.indexOf('62') === 0) n = '0' + n.slice(2);
+  else if (n.indexOf('8') === 0) n = '0' + n;
+  return n.replace(/\D/g, '');
+}
+/* '8,5' / '8.5' / '8,5 kg' → 8.5; kosong → ''; bukan angka → NaN */
+function bacaAngka(v) {
+  const s = String(v === null || v === undefined ? '' : v).trim().replace(/\s*(kg|cm|gram|g)$/i, '').replace(',', '.');
+  if (!s) return '';
+  return /^\d+(\.\d+)?$/.test(s) ? parseFloat(s) : NaN;
+}
+/* Berat lahir dalam gram: '3200', '3.200' (titik ribuan) dan '3,2' (kg) → 3200 */
+function gramLahir(v) {
+  const n = bacaAngka(String(v === null || v === undefined ? '' : v).trim().replace(/^(\d{1,2})\.(\d{3})$/, '$1$2'));
+  return n === '' || isNaN(n) ? n : Math.round(n < 10 ? n * 1000 : n);
+}
+const ribuan = n => Number(n).toLocaleString('id-ID');
+/* Digit 7–12 NIK = tanggal lahir (DDMMYY, perempuan +40) */
+function infoNIK(nik) {
+  if (!/^\d{16}$/.test(nik)) return null;
+  let dd = +nik.slice(6, 8), jk = 'L';
+  const mm = +nik.slice(8, 10), yy = +nik.slice(10, 12);
+  if (dd > 40) { dd -= 40; jk = 'P'; }
+  if (dd < 1 || dd > 31 || mm < 1 || mm > 12) return null;
+  let tgl = (2000 + yy) + '-' + String(mm).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
+  if (tgl > hariIni()) tgl = (1900 + yy) + tgl.slice(4);
+  return { tgl, jk };
+}
+const urutNama = (a, b) => String(a.nama || '').localeCompare(String(b.nama || ''), 'id');
+const inisial = n =>String(n || '?').split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join('');
 const idBaru = p => p + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 5).toUpperCase();
 async function sha12(teks) {
   const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(teks));
@@ -390,7 +428,8 @@ function daftarRisiko() {
   sasaran(P).forEach(b => {
     const u = ukurDi(b.id, P) || ukurDi(b.id, P1);
     const si = statusImun(b);
-    const skor = skorRisiko({ bbLahir: b.bbLahir, pbLahir: b.pbLahir, prematur: b.prematur, imunTerlambat: si.list.some(x => x.status === 'Terlambat'),
+    const bbl = gramLahir(b.bbLahir), pbl = bacaAngka(b.pbLahir);
+    const skor = skorRisiko({ bbLahir: isNaN(bbl) ? '' : bbl, pbLahir: isNaN(pbl) ? '' : pbl, prematur: b.prematur, imunTerlambat: si.list.some(x => x.status === 'Terlambat'),
       vitATidak: si.usia >= 6 && !vitASudah(b, periodeVitA(P)), nt: u ? u.nt : '', zTBU: u ? kosongNull(u.zTBU) : null });
     const t = tlTerbuka(b.id);
     if (u && (u.label === 'Merah' || u.label === 'Kuning')) out[u.label].push({ b, u, skor, t });
@@ -478,7 +517,7 @@ function viewLogin() {
 async function kirimLogin(f) {
   const tombol = f.querySelector('button[type=submit]');
   tombol.disabled = true; tombol.innerHTML = '<span class="spinner"></span> Masuk…';
-  const r = await api('login', { username: f.username.value, pin: f.pin.value, perangkat: navigator.userAgent.slice(0, 100) });
+  const r = await api('login', { username: f.username.value.trim().toLowerCase(), pin: f.pin.value.trim(), perangkat: navigator.userAgent.slice(0, 100) });
   if (!r.ok) { $('#galat').innerHTML = `<div class="pesan-galat">${esc(r.pesan)}</div>`; tombol.disabled = false; tombol.textContent = 'Masuk'; return; }
   const lama = await DB.get('sesi');
   S.sesi = { token: r.data.token, user: r.data.user, kedaluwarsa: r.data.kedaluwarsa };
@@ -585,11 +624,12 @@ function viewUkur() {
 }
 
 async function cocokCari(list, q) {
-  q = q.trim().toLowerCase();
+  q = rapiSpasi(q).toLowerCase();
   if (!q) return list;
   const angkaSaja = q.replace(/\D/g, '');
   let h16 = '';
-  if (/^\d{16}$/.test(q)) h16 = await sha12(q);
+  // NIK boleh diketik dengan spasi/titik, mis. 3304 0112 3456 0001
+  if (/^[\d\s.-]+$/.test(q) && angkaSaja.length === 16) h16 = await sha12(angkaSaja);
   return list.filter(b => (b.nama || '').toLowerCase().indexOf(q) >= 0 || (b.ibu || '').toLowerCase().indexOf(q) >= 0 ||
     (b.ayah || '').toLowerCase().indexOf(q) >= 0 || (h16 && b.nikHash === h16) || (angkaSaja.length >= 4 && String(b.nik || '').indexOf(angkaSaja) >= 0));
 }
@@ -597,7 +637,7 @@ async function cocokCari(list, q) {
 async function isiDaftarUkur() {
   const el = $('#daftarUkur'); if (!el) return;
   const p = S.periode;
-  let list = sasaran(p).sort((a, b) => a.nama < b.nama ? -1 : 1);
+  let list = sasaran(p).sort(urutNama);
   const total = list.length, sudah = list.filter(b => ukurDi(b.id, p)).length;
   if (S.filterUkur === 'belum') list = list.filter(b => !ukurDi(b.id, p));
   if (S.filterUkur === 'sudah') list = list.filter(b => ukurDi(b.id, p));
@@ -606,7 +646,7 @@ async function isiDaftarUkur() {
     const u = ukurDi(b.id, p);
     return `<button class="item" data-aksi="formUkur" data-id="${esc(b.id)}">
       <span class="avatar ${b.jk}">${esc(inisial(b.nama))}</span>
-      <span class="isi"><div class="nama">${esc(b.nama)}</div><div class="sub">${usiaTeks(usiaBulan(b.tglLahir, akhirPeriode(p) > hariIni() ? hariIni() : akhirPeriode(p)))} · Ibu ${esc(b.ibu || '–')} · RT ${esc(b.rt)}/${esc(b.rw)}${admin() && !S.pos ? ' · ' + esc(b.posyandu) : ''}</div></span>
+      <span class="isi"><div class="nama">${esc(b.nama)}</div><div class="sub">${usiaTeks(usiaBulan(b.tglLahir, akhirPeriode(p) > hariIni() ? hariIni() : akhirPeriode(p)))} · Ibu ${esc(b.ibu || '–')} · ${rtRw(b)}${admin() && !S.pos ? ' · ' + esc(b.posyandu) : ''}</div></span>
       ${u ? `<span class="lbl ${u.label}">${u.label}</span><span class="centang ${u._lokal ? 'lokal' : 'sudah'}">${ikon(u._lokal ? 'jam' : 'centang', 18)}</span>` : '<span class="centang belum"></span>'}
     </button>`; }).join('')}</div>` : `<div class="kosong">${S.filterUkur === 'belum' && !S.cari ? 'Semua balita sudah diukur. Terima kasih!' : 'Tidak ada balita yang cocok.'}</div>`);
 }
@@ -652,8 +692,13 @@ function formUkur(id, periode) {
 
 async function simpanUkur(f) {
   const id = f.dataset.id, periode = f.dataset.periode, b = S.d.byId[id];
-  const x = { id, periode, tglUkur: f.tglUkur.value, bb: keAngka(f.bb.value), tb: keAngka(f.tb.value), cara: f.cara.value,
-              lila: keAngka(f.lila.value), lk: keAngka(f.lk.value), base: f.dataset.base || '' };
+  const x = { id, periode, tglUkur: f.tglUkur.value, cara: f.cara.value, base: f.dataset.base || '' };
+  const nama = { bb: 'Berat badan', tb: 'Panjang/tinggi badan', lila: 'Lingkar lengan', lk: 'Lingkar kepala' };
+  for (const k of Object.keys(nama)) {
+    const n = bacaAngka(f[k].value);
+    if (Number.isNaN(n)) { $('#galatUkur').innerHTML = `<div class="pesan-galat">${nama[k]} harus berupa angka, contoh ${k === 'bb' ? '8,5' : '72,4'}.</div>`; return; }
+    x[k] = n === '' ? 0 : n;
+  }
   const err = validasiUkur(x, b.tglLahir);
   if (err) { $('#galatUkur').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
   if (usiaBulan(b.tglLahir, x.tglUkur) > 60) { $('#galatUkur').innerHTML = `<div class="pesan-galat">Usia sudah lebih dari 60 bulan.</div>`; return; }
@@ -667,8 +712,8 @@ async function simpanUkur(f) {
 
 function tampilHasil(b, u) {
   const p = u.periode;
-  const berikut = sasaran(p).filter(z => !ukurDi(z.id, p) && z.id !== b.id).sort((a, c) => a.nama < c.nama ? -1 : 1)
-    .find(z => z.nama > b.nama) || sasaran(p).find(z => !ukurDi(z.id, p));
+  const berikut = sasaran(p).filter(z => !ukurDi(z.id, p) && z.id !== b.id).sort(urutNama)
+    .find(z => urutNama(z, b) > 0) || sasaran(p).find(z => !ukurDi(z.id, p));
   const baris = (n, z, st) => st ? `<tr><td>${n}</td><td class="angka-sel">${z === '' || z === null ? '–' : angka(z)}</td><td>${esc(st)}</td></tr>` : '';
   bukaLembar(`
     <h3>${esc(b.nama)}</h3><div class="redup kecil" style="margin-bottom:12px">Tersimpan ${S.online ? '' : '(akan dikirim saat ada sinyal)'} · ${namaPeriode(p)}</div>
@@ -705,9 +750,9 @@ function viewBalita(id) {
       ${usulan.length ? `<div class="pesan-awas" style="margin-top:12px">Diusulkan keluar (${esc(usulan[0].Alasan)}), menunggu persetujuan admin.</div>` : ''}
       <div class="tabel-wrap"><table style="margin-top:8px">
         ${ket('Tanggal lahir', fmtTgl(b.tglLahir))}${ket('NIK', esc(b.nik || '–'))}${ket('No KK', esc(b.kk || '–'))}
-        ${ket('Ayah / Ibu', esc((b.ayah || '–') + ' / ' + (b.ibu || '–')))}${ket('RT / RW', esc(b.rt + ' / ' + b.rw))}
+        ${ket('Ayah / Ibu', esc((b.ayah || '–') + ' / ' + (b.ibu || '–')))}${ket('RT / RW', rtRw(b).slice(6))}
         ${b.hp ? ket('HP orang tua', `<a href="tel:${esc(b.hp)}">${esc(b.hp)}</a>`) : ''}
-        ${ket('Lahir', (b.bbLahir ? angka(b.bbLahir) + ' g' : '–') + ' · ' + (b.pbLahir ? angka(b.pbLahir) + ' cm' : '–') + (b.prematur === 'Y' ? ' · prematur' : ''))}
+        ${ket('Lahir', (+b.bbLahir ? ribuan(b.bbLahir) + ' g' : '–') + ' · ' + (b.pbLahir ? angka(b.pbLahir) + ' cm' : '–') + (b.prematur === 'Y' ? ' · prematur' : ''))}
         ${b.tglKeluar ? ket('Keluar', fmtTgl(b.tglKeluar)) : ''}
       </table></div>
       <div class="deret-tombol" style="margin-top:12px">
@@ -817,7 +862,7 @@ function formTL(id) {
   const rujuk = ['Bidan desa', 'Puskesmas Purwanegara', 'Dokter/RS', 'Ahli gizi Puskesmas', 'Lainnya'];
   const iv = ['PMT', 'Konseling gizi', 'Kunjungan rumah', 'Pemeriksaan dokter', 'Rujuk RS'];
   const sudahIv = t && t.Intervensi ? String(t.Intervensi).split(', ') : [];
-  bukaLembar(`<h3>Tindak lanjut</h3><div class="redup kecil" style="margin-bottom:12px">${esc(b.nama)} · Ibu ${esc(b.ibu || '–')} · RT ${esc(b.rt)}/${esc(b.rw)}</div>
+  bukaLembar(`<h3>Tindak lanjut</h3><div class="redup kecil" style="margin-bottom:12px">${esc(b.nama)} · Ibu ${esc(b.ibu || '–')} · ${rtRw(b)}</div>
     ${t ? `<div class="hasil ${t.Label}"><b>${esc(t.Label)}</b> sejak ${fmtTgl(t.Tgl_Terdeteksi)}<div class="kecil">${esc(t.Alasan)}</div></div>`
        : u && u.label !== 'Hijau' ? `<div class="hasil ${u.label}"><b>${u.label}</b><div class="kecil">${esc(u.alasan)}</div></div>` : ''}
     <form id="fTL" data-id="${esc(id)}" data-tl="${t && String(t.ID).indexOf('L-') !== 0 ? esc(t.ID) : ''}" data-label="${esc(u ? u.label : 'Kuning')}" data-alasan="${esc(u ? u.alasan : '')}">
@@ -855,7 +900,7 @@ function viewImunisasi() {
     .map(b => ({ b, ket: jenisVitA(usiaBulan(b.tglLahir, hariIni())) === 'VitA_Biru' ? 'Kapsul biru' : 'Kapsul merah' }));
   else list = sas.map(b => ({ b, v: statusImun(b).list.filter(x => x.status === S.tabImun) })).filter(x => x.v.length)
     .map(x => ({ b: x.b, ket: x.v.map(v => v.nama).join(', ') }));
-  list.sort((a, c) => a.b.nama < c.b.nama ? -1 : 1);
+  list.sort((a, c) => urutNama(a.b, c.b));
   return { judul: 'Imunisasi & Vitamin', html: `
     ${admin() ? pilihPosyandu() : ''}
     <div class="chips">${['Jatuh tempo', 'Terlambat', 'Vitamin A'].map(t => `<button class="chip ${S.tabImun === t ? 'aktif' : ''}" data-aksi="tabImun" data-t="${t}">${t}</button>`).join('')}</div>
@@ -865,7 +910,7 @@ function viewImunisasi() {
       ${list.length ? '<button class="tombol garis kecil" data-aksi="salinWA">Salin untuk WhatsApp</button>' : ''}</div>
     ${list.length ? `<div class="daftar">${list.map(x => `<button class="item" data-aksi="ke" data-ke="balita/${esc(x.b.id)}">
       <span class="avatar ${x.b.jk}">${esc(inisial(x.b.nama))}</span>
-      <span class="isi"><div class="nama">${esc(x.b.nama)}</div><div class="sub">${usiaTeks(usiaBulan(x.b.tglLahir, hariIni()))} · Ibu ${esc(x.b.ibu || '–')} · RT ${esc(x.b.rt)}/${esc(x.b.rw)}</div><div class="sub" style="white-space:normal;color:var(--teks)">${esc(x.ket)}</div></span>${ikon('kanan', 18)}</button>`).join('')}</div>`
+      <span class="isi"><div class="nama">${esc(x.b.nama)}</div><div class="sub">${usiaTeks(usiaBulan(x.b.tglLahir, hariIni()))} · Ibu ${esc(x.b.ibu || '–')} · ${rtRw(x.b)}</div><div class="sub" style="white-space:normal;color:var(--teks)">${esc(x.ket)}</div></span>${ikon('kanan', 18)}</button>`).join('')}</div>`
       : '<div class="kosong">Tidak ada balita dalam daftar ini.</div>'}`,
     data: list };
 }
@@ -877,7 +922,7 @@ function viewRisiko() {
     <span class="avatar ${x.b.jk}">${esc(inisial(x.b.nama))}</span>
     <span class="isi"><div class="nama">${esc(x.b.nama)}</div>
       <div class="sub">${absen ? 'Terakhir ditimbang ' + namaPeriode(x.u.periode) : esc(x.u.alasan)}</div>
-      <div class="sub">Ibu ${esc(x.b.ibu || '–')} · RT ${esc(x.b.rt)}/${esc(x.b.rw)}${admin() && !S.pos ? ' · ' + esc(x.b.posyandu) : ''}${x.skor ? ' · skor ' + x.skor : ''}</div></span>
+      <div class="sub">Ibu ${esc(x.b.ibu || '–')} · ${rtRw(x.b)}${admin() && !S.pos ? ' · ' + esc(x.b.posyandu) : ''}${x.skor ? ' · skor ' + x.skor : ''}</div></span>
     ${absen ? ikon('kanan', 18) : `<span class="lbl ${!x.t ? 'Abu' : x.t.Status === 'Belum' ? 'Merah' : x.t.Status === 'Sedang' ? 'Biru' : 'Hijau'}">${x.t ? esc(x.t.Status) : 'Belum'}</span>`}</button>`;
   const bagian = (judul, l, absen) => `<div class="judul-bagian">${judul} (${l.length})</div>` + (l.length ? `<div class="daftar">${l.map(x => item(x, absen)).join('')}</div>` : '<div class="kosong" style="padding:14px">Tidak ada.</div>');
   return { judul: 'Risiko & Tindak Lanjut', html: `
@@ -940,10 +985,10 @@ function viewDataBalita() {
 async function isiDataBalita() {
   const el = $('#daftarB'); if (!el) return;
   let l = S.d.balita.filter(b => posTerpilih(b) && (S.filterBalita === 'Keluar' ? ['Lulus', 'Pindah', 'Meninggal', 'Ditolak'].indexOf(b.status) >= 0 : b.status === S.filterBalita));
-  l = (await cocokCari(l, S.cari)).sort((a, b) => a.nama < b.nama ? -1 : 1);
+  l = (await cocokCari(l, S.cari)).sort(urutNama);
   el.innerHTML = `<p class="redup kecil" style="margin:0 4px 8px">${l.length} balita</p>` + (l.length ? `<div class="daftar">${l.slice(0, 400).map(b => `<button class="item" data-aksi="ke" data-ke="balita/${esc(b.id)}">
     <span class="avatar ${b.jk}">${esc(inisial(b.nama))}</span><span class="isi"><div class="nama">${esc(b.nama)}${b._lokal ? ' ⏳' : ''}</div>
-    <div class="sub">${b.tglLahir ? usiaTeks(usiaBulan(b.tglLahir, hariIni())) : 'tgl lahir kosong'} · Ibu ${esc(b.ibu || '–')} · RT ${esc(b.rt)}/${esc(b.rw)}${admin() && !S.pos ? ' · ' + esc(b.posyandu) : ''}</div></span>
+    <div class="sub">${b.tglLahir ? usiaTeks(usiaBulan(b.tglLahir, hariIni())) : 'tgl lahir kosong'} · Ibu ${esc(b.ibu || '–')} · ${rtRw(b)}${admin() && !S.pos ? ' · ' + esc(b.posyandu) : ''}</div></span>
     ${S.filterBalita === 'Keluar' ? `<span class="lbl Abu">${esc(b.status)}</span>` : ikon('kanan', 18)}</button>`).join('')}</div>` : '<div class="kosong">Tidak ada data.</div>');
 }
 
@@ -953,7 +998,7 @@ function viewFormBalita(id) {
   return { judul: b ? 'Ubah data balita' : 'Tambah balita', nav: 'menu', html: `
     <form id="fBalita" class="kartu" data-id="${b ? esc(b.id) : ''}">
       ${!b ? `<label class="isian"><span>Alasan masuk</span><select name="alasanMasuk"><option>Lahir</option><option>Pindah datang</option><option>Baru terdata</option></select></label>` : ''}
-      <label class="isian"><span>Nama balita *</span><input name="nama" value="${v('nama')}" required autocapitalize="characters"></label>
+      <label class="isian"><span>Nama balita * (sesuai KK/akta)</span><input name="nama" value="${v('nama')}" required autocapitalize="characters" maxlength="60" placeholder="Contoh: AHMAD FAUZI"></label>
       <div class="grid2">
         <label class="isian"><span>Jenis kelamin *</span><select name="jk" required><option value="">Pilih…</option><option value="L" ${b && b.jk === 'L' ? 'selected' : ''}>Laki-laki</option><option value="P" ${b && b.jk === 'P' ? 'selected' : ''}>Perempuan</option></select></label>
         <label class="isian"><span>Tanggal lahir *</span><input type="date" name="tglLahir" value="${v('tglLahir')}" max="${hariIni()}" required></label>
@@ -961,21 +1006,21 @@ function viewFormBalita(id) {
       <label class="isian"><span>NIK (16 angka)</span><input name="nik" inputmode="numeric" maxlength="16" placeholder="${b && b.nik ? esc(b.nik) + ' — isi untuk mengganti' : 'Kosongkan jika belum punya'}" value="${admin() ? v('nik') : ''}"></label>
       <label class="isian"><span>No KK (16 angka)</span><input name="kk" inputmode="numeric" maxlength="16" placeholder="${b && b.kk ? esc(b.kk) + ' — isi untuk mengganti' : ''}" value="${admin() ? v('kk') : ''}"></label>
       <div class="grid2">
-        <label class="isian"><span>Nama ayah</span><input name="ayah" value="${v('ayah')}"></label>
-        <label class="isian"><span>Nama ibu</span><input name="ibu" value="${v('ibu')}"></label>
+        <label class="isian"><span>Nama ayah</span><input name="ayah" value="${v('ayah')}" autocapitalize="characters" maxlength="60"></label>
+        <label class="isian"><span>Nama ibu</span><input name="ibu" value="${v('ibu')}" autocapitalize="characters" maxlength="60"></label>
       </div>
       <div class="grid3">
-        <label class="isian"><span>RT</span><input name="rt" inputmode="numeric" value="${v('rt')}"></label>
-        <label class="isian"><span>RW</span><input name="rw" inputmode="numeric" value="${v('rw')}"></label>
+        <label class="isian"><span>RT</span><input name="rt" inputmode="numeric" maxlength="3" placeholder="001" value="${b && b.rt ? String(b.rt).padStart(3, '0') : ''}"></label>
+        <label class="isian"><span>RW</span><input name="rw" inputmode="numeric" maxlength="3" placeholder="002" value="${b && b.rw ? String(b.rw).padStart(3, '0') : ''}"></label>
         <label class="isian"><span>Prematur</span><select name="prematur"><option value="T">Tidak</option><option value="Y" ${b && b.prematur === 'Y' ? 'selected' : ''}>Ya</option></select></label>
       </div>
       ${admin() ? `<label class="isian"><span>Posyandu *</span><select name="posyandu" required>${S.d.posyandu.map(p => `<option ${(b ? b.posyandu : S.pos) === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>` : ''}
       <div class="grid2">
-        <label class="isian"><span>Berat lahir (gram)</span><input name="bbLahir" inputmode="numeric" value="${v('bbLahir')}"></label>
-        <label class="isian"><span>Panjang lahir (cm)</span><input name="pbLahir" inputmode="decimal" value="${v('pbLahir')}"></label>
+        <label class="isian"><span>Berat lahir (gram)</span><input name="bbLahir" inputmode="decimal" placeholder="Contoh: 3200" value="${v('bbLahir')}"></label>
+        <label class="isian"><span>Panjang lahir (cm)</span><input name="pbLahir" inputmode="decimal" placeholder="Contoh: 49,5" value="${b ? esc(angka(b.pbLahir).replace('–', '')) : ''}"></label>
       </div>
-      <label class="isian"><span>No HP orang tua</span><input name="hp" inputmode="tel" value="${v('hp')}"></label>
-      <label class="isian"><span>Catatan</span><input name="catatan" value="${v('catatan')}"></label>
+      <label class="isian"><span>No HP orang tua</span><input name="hp" type="tel" inputmode="tel" maxlength="16" placeholder="Contoh: 081234567890" value="${v('hp')}"></label>
+      <label class="isian"><span>Catatan</span><input name="catatan" maxlength="200" value="${v('catatan')}"></label>
       <div id="galatB"></div>
       <button class="tombol penuh" type="submit">Simpan</button>
       ${!b && !admin() ? '<p class="redup kecil">Balita baru berstatus Menunggu sampai disetujui admin, tetapi sudah bisa diukur.</p>' : ''}
@@ -984,14 +1029,27 @@ function viewFormBalita(id) {
 
 async function simpanBalitaForm(f) {
   const nik = f.nik.value.replace(/\D/g, ''), kk = f.kk.value.replace(/\D/g, '');
-  const err = !f.nama.value.trim() ? 'Nama wajib diisi.' : !f.jk.value ? 'Pilih jenis kelamin.' : !f.tglLahir.value ? 'Tanggal lahir wajib diisi.'
+  const nama = rapiNama(f.nama.value), ayah = rapiNama(f.ayah.value), ibu = rapiNama(f.ibu.value);
+  const rt = rapiRT(f.rt.value), rw = rapiRT(f.rw.value), hp = rapiHP(f.hp.value);
+  const bbLahir = gramLahir(f.bbLahir.value), pbLahir = bacaAngka(f.pbLahir.value);
+  const err = nama.length < 2 ? 'Nama wajib diisi.' : !namaSah(nama) ? 'Nama hanya boleh huruf, spasi, titik, koma, apostrof, dan tanda hubung.'
+    : (ayah && !namaSah(ayah)) || (ibu && !namaSah(ibu)) ? 'Nama ayah/ibu hanya boleh huruf, spasi, titik, koma, apostrof, dan tanda hubung.'
+    : !f.jk.value ? 'Pilih jenis kelamin.' : !f.tglLahir.value ? 'Tanggal lahir wajib diisi.'
     : f.tglLahir.value > hariIni() ? 'Tanggal lahir setelah hari ini.' : usiaBulan(f.tglLahir.value, hariIni()) >= 60 ? 'Usia sudah 60 bulan atau lebih.'
-    : nik && nik.length !== 16 ? 'NIK harus 16 angka.' : kk && kk.length !== 16 ? 'No KK harus 16 angka.' : '';
+    : nik && nik.length !== 16 ? 'NIK harus 16 angka.' : nik && (+nik.slice(0, 2) < 11 || +nik.slice(0, 2) > 94) ? 'NIK tidak sah: 2 angka pertama harus kode provinsi (11–94).'
+    : kk && kk.length !== 16 ? 'No KK harus 16 angka.' : kk && (+kk.slice(0, 2) < 11 || +kk.slice(0, 2) > 94) ? 'No KK tidak sah: 2 angka pertama harus kode provinsi (11–94).'
+    : nik && nik === kk ? 'NIK dan No KK tidak boleh sama.'
+    : (f.rt.value.trim() && !rt) || +rt > 999 || (f.rw.value.trim() && !rw) || +rw > 999 ? 'RT/RW diisi angka 1 sampai 3 digit, contoh 001.'
+    : hp && !/^08\d{8,11}$/.test(hp) ? 'No HP harus diawali 08 dan berisi 10–13 angka, contoh 081234567890.'
+    : Number.isNaN(bbLahir) || (bbLahir !== '' && (bbLahir < 500 || bbLahir > 6000)) ? 'Berat lahir diisi dalam gram (500–6.000), contoh 3200.'
+    : Number.isNaN(pbLahir) || (pbLahir !== '' && (pbLahir < 25 || pbLahir > 65)) ? 'Panjang lahir diisi dalam cm (25–65), contoh 49,5.' : '';
   if (err) { $('#galatB').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
+  const cocokNIK = infoNIK(nik);
+  if (cocokNIK && (cocokNIK.tgl !== f.tglLahir.value || cocokNIK.jk !== f.jk.value) && !await konfirmasi('Periksa NIK',
+    `Menurut NIK, anak ini ${cocokNIK.jk === 'L' ? 'laki-laki' : 'perempuan'} lahir ${fmtTgl(cocokNIK.tgl)}, berbeda dengan isian. Tetap simpan?`, 'Tetap simpan')) return;
   const id = f.dataset.id || idBaru('BLT-K');
-  const x = { id, nama: f.nama.value.trim(), jk: f.jk.value, tglLahir: f.tglLahir.value, nik, kk, ayah: f.ayah.value.trim(), ibu: f.ibu.value.trim(),
-    rt: f.rt.value.trim(), rw: f.rw.value.trim(), prematur: f.prematur.value, bbLahir: f.bbLahir.value.trim(), pbLahir: f.pbLahir.value.replace(',', '.').trim(),
-    hp: f.hp.value.trim(), catatan: f.catatan.value.trim(), posyandu: f.posyandu ? f.posyandu.value : S.sesi.user.posyandu };
+  const x = { id, nama, jk: f.jk.value, tglLahir: f.tglLahir.value, nik, kk, ayah, ibu, rt, rw, prematur: f.prematur.value, bbLahir, pbLahir,
+    hp, catatan: rapiSpasi(f.catatan.value), posyandu: f.posyandu ? f.posyandu.value : S.sesi.user.posyandu };
   if (!f.dataset.id) x.alasanMasuk = f.alasanMasuk.value;
   if (!f.dataset.id && nik) {
     const h = await sha12(nik);
@@ -1208,7 +1266,7 @@ const AKSI = {
   salinWA: async () => {
     const v = viewImunisasi(), P = periodeKini();
     const teks = `*${S.tabImun === 'Vitamin A' ? 'Sasaran Vitamin A ' + namaPeriode(periodeVitA(P)) : 'Imunisasi ' + S.tabImun.toLowerCase()}* — ${admin() && !S.pos ? S.d.desa : 'Posyandu ' + (S.pos || S.d.user.posyandu)}\n` +
-      v.data.map((x, i) => `${i + 1}. ${x.b.nama} (RT ${x.b.rt}/${x.b.rw}, ibu ${x.b.ibu || '-'}) — ${x.ket}`).join('\n');
+      v.data.map((x, i) => `${i + 1}. ${x.b.nama} (${rtRw(x.b)}, ibu ${x.b.ibu || '-'}) — ${x.ket}`).join('\n');
     try { await navigator.clipboard.writeText(teks); toast('Daftar disalin. Tempel di WhatsApp.'); }
     catch (e) { bukaLembar(`<h3>Salin teks</h3><textarea style="min-height:240px">${esc(teks)}</textarea>`); }
   },
@@ -1260,29 +1318,34 @@ const KIRIM = {
   },
   fVit: async f => {
     const b = S.d.byId[f.dataset.id];
+    if (!f.tgl.value || f.tgl.value < b.tglLahir || f.tgl.value > hariIni()) { toast('Tanggal tidak valid.'); return; }
     await antrekan('simpanVitamin', { id: f.dataset.id, jenis: f.jenis.value, tgl: f.tgl.value }, 'Vitamin/obat cacing ' + b.nama);
     tutupLembar(); render(); toast('Tercatat.');
   },
   fTL: async f => {
     const b = S.d.byId[f.dataset.id];
     const iv = Array.from(f.querySelectorAll('input[name=iv]:checked')).map(i => i.value).join(', ');
-    await antrekan('simpanTindakLanjut', { id: f.dataset.id, idTL: f.dataset.tl, status: f.status.value, tglRujuk: f.tglRujuk.value, dirujukKe: f.dirujukKe.value,
-      intervensi: iv, hasil: f.hasil.value.trim(), label: f.dataset.label, alasan: f.dataset.alasan }, 'Tindak lanjut ' + b.nama);
+    // Tanggal rujuk hanya bermakna bila tujuan rujukan dipilih
+    await antrekan('simpanTindakLanjut', { id: f.dataset.id, idTL: f.dataset.tl, status: f.status.value, tglRujuk: f.dirujukKe.value ? f.tglRujuk.value : '', dirujukKe: f.dirujukKe.value,
+      intervensi: iv, hasil: rapiSpasi(f.hasil.value), label: f.dataset.label, alasan: f.dataset.alasan }, 'Tindak lanjut ' + b.nama);
     tutupLembar(); render(); toast('Tindak lanjut tercatat.');
   },
   fMutasi: async f => {
     const b = S.d.byId[f.dataset.id];
     if (!f.alasan.value) { toast('Pilih alasan.'); return; }
-    await antrekan('usulMutasi', { id: f.dataset.id, jenis: 'Keluar', alasan: f.alasan.value, tanggal: f.tanggal.value, keterangan: f.keterangan.value.trim() }, 'Keluar: ' + b.nama);
+    await antrekan('usulMutasi', { id: f.dataset.id, jenis: 'Keluar', alasan: f.alasan.value, tanggal: f.tanggal.value, keterangan: rapiSpasi(f.keterangan.value) }, 'Keluar: ' + b.nama);
     tutupLembar(); toast(admin() ? 'Balita dikeluarkan dari daftar.' : 'Usulan terkirim ke admin.'); render();
   },
   fUser: async f => {
-    const r = await api('simpanUser', { nama: f.nama.value.trim(), username: f.username.value.trim().toLowerCase(), peran: f.peran.value, posyandu: f.posyandu.value,
-      pinBaru: f.pinBaru.value.trim(), aktif: f.aktif.value });
+    const pin = f.pinBaru.value.trim();
+    if (pin && !/^\d{4,8}$/.test(pin)) { $('#galatU').innerHTML = '<div class="pesan-galat">PIN harus 4 sampai 8 angka.</div>'; return; }
+    const r = await api('simpanUser', { nama: rapiSpasi(f.nama.value), username: f.username.value.trim().toLowerCase(), peran: f.peran.value, posyandu: f.posyandu.value,
+      pinBaru: pin, aktif: f.aktif.value });
     if (!r.ok) { $('#galatU').innerHTML = `<div class="pesan-galat">${esc(r.pesan)}</div>`; return; }
     tutupLembar(); toast('Akun tersimpan.'); render();
   },
   fPin: async f => {
+    if (!/^\d{4,8}$/.test(f.pinBaru.value)) { $('#galatPin').innerHTML = '<div class="pesan-galat">PIN baru harus 4 sampai 8 angka.</div>'; return; }
     if (f.pinBaru.value !== f.pinBaru2.value) { $('#galatPin').innerHTML = '<div class="pesan-galat">PIN baru tidak sama.</div>'; return; }
     const r = await api('gantiPin', { pinLama: f.pinLama.value, pinBaru: f.pinBaru.value });
     if (!r.ok) { $('#galatPin').innerHTML = `<div class="pesan-galat">${esc(r.pesan)}</div>`; return; }
