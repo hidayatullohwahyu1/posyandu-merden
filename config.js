@@ -5,5 +5,5 @@ window.CONFIG_APP = {
   API_URL: 'https://script.google.com/macros/s/AKfycbyYi_LgSlwkytZa2Ev-3PzBNzFZwE8L99hnOBm-TxW_5K8SZR4ATiihHEEnuMkpTaLDzA/exec',
   NAMA: 'Posyandu Merden',
   DESA: 'Desa Merden',
-  VERSI: '1.4.0'
+  VERSI: '1.4.1'
 };

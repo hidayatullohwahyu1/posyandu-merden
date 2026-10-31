@@ -582,7 +582,7 @@ function viewBeranda() {
   const menunggu = admin() ? S.d.balita.filter(b => b.status === 'Menunggu').length + S.d.usulan.filter(x => x.Status === 'Diusulkan').length : 0;
   const menitSinkron = Math.round((Date.now() - (S.dasar.waktuSinkron || 0)) / 60000);
   const jam = new Date().getHours();
-  const salam = jam < 11 ? 'Selamat pagi' : jam < 15 ? 'Selamat siang' : jam < 18 ? 'Selamat sore' : 'Selamat malam';
+  const salam = jam < 4 ? 'Selamat malam' : jam < 11 ? 'Selamat pagi' : jam < 15 ? 'Selamat siang' : jam < 18 ? 'Selamat sore' : 'Selamat malam';
   const bdg = n => n ? `<span class="bdg">${n > 99 ? '99+' : n}</span>` : '';
   const tombolBulat = (aksi, ke, warna, ik, teks, n) => `<button data-aksi="${aksi}" data-ke="${ke}"><span class="bulat ${warna}">${ikon(ik, 24)}</span>${teks}${bdg(n)}</button>`;
   const layanan = [
@@ -741,6 +741,11 @@ async function simpanUkur(f) {
   if (usiaBulan(b.tglLahir, x.tglUkur) > 60) { $('#galatUkur').innerHTML = `<div class="pesan-galat">Usia sudah lebih dari 60 bulan.</div>`; return; }
   const lalu = ukurDi(id, geserPeriode(periode, -1));
   const w = peringatanUkur(x, lalu);
+  // Nilai di luar batas kewajaran WHO (salah ketik, mis. 12,4 untuk bayi 2 bulan atau kg tertukar cm)
+  const g = hitungGizi({ jk: b.jk, tglLahir: b.tglLahir, tglUkur: x.tglUkur, bb: x.bb, tb: x.tb, cara: x.cara, lila: x.lila, lk: x.lk });
+  const aneh = [['zBBU', -6, 5, 'Berat badan menurut umur'], ['zTBU', -6, 6, 'Tinggi badan menurut umur'], ['zBBTB', -5, 5, 'Berat menurut tinggi'], ['zLKU', -5, 5, 'Lingkar kepala']]
+    .filter(([k, lo, hi]) => g[k] !== null && g[k] !== undefined && (g[k] < lo || g[k] > hi)).map(a => a[3] + ' sangat tidak wajar untuk usia ' + usiaTeks(g.usiaBln) + '.');
+  w.unshift(...aneh);
   if (w.length && !await konfirmasi('Periksa kembali angkanya', w.map(esc).join('<br>') + '<br><br>Apakah angka sudah benar?', 'Ya, tetap simpan')) return;
   await antrekan('simpanPengukuran', x, 'Ukur ' + b.nama + ' (' + namaPeriode(periode) + ')');
   const u = ukurDi(id, periode);
@@ -1455,6 +1460,10 @@ const KIRIM = {
   fVit: async f => {
     const b = S.d.byId[f.dataset.id];
     if (!f.tgl.value || f.tgl.value < b.tglLahir || f.tgl.value > hariIni()) { toast('Tanggal tidak valid.'); return; }
+    const usia = usiaBulan(b.tglLahir, f.tgl.value), j = f.jenis.value;
+    const cocok = j === 'Obat_Cacing' ? usia >= 12 : j === jenisVitA(usia);
+    const anjuran = { VitA_Biru: 'kapsul biru untuk 6–11 bulan', VitA_Merah: 'kapsul merah untuk 12–59 bulan', Obat_Cacing: 'obat cacing mulai usia 12 bulan' }[j];
+    if (!cocok && !await konfirmasi('Periksa jenis dan usia', `Anak berusia ${usiaTeks(usia)} pada tanggal pemberian, sedangkan anjurannya ${anjuran}. Tetap simpan?`, 'Tetap simpan')) return;
     await antrekan('simpanVitamin', { id: f.dataset.id, jenis: f.jenis.value, tgl: f.tgl.value }, 'Vitamin/obat cacing ' + b.nama);
     tutupLembar(); render(); toast('Tercatat.');
   },
