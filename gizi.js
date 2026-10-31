@@ -273,13 +273,68 @@ function hitungLansia(p) {
   if (p.riwayatHT === 'Y') riw.push('hipertensi');
   if (p.riwayatDM === 'Y') riw.push('diabetes');
   if (riw.length && p.obat === 'T') kuning.push('Riwayat ' + riw.join(' dan ') + ' tetapi tidak minum obat rutin');
-  return { imt: imt, stIMT: stIMT, stLP: stLP, stTD: stTD,
+  var stGD = statusGula(p.gd, p.jenisGD), stKol = statusKolesterol(p.kol), stAU = statusAsamUrat(p.au, p.jk);
+  if (stGD === 'Tinggi') kuning.push('Gula darah ' + (p.jenisGD === 'Puasa' ? 'puasa' : 'sewaktu') + ' tinggi (' + p.gd + ' mg/dL) — curiga diabetes');
+  if (stGD === 'Pra-diabetes') kuning.push('Gula darah puasa pra-diabetes (' + p.gd + ' mg/dL)');
+  if (stKol === 'Tinggi') kuning.push('Kolesterol tinggi (' + p.kol + ' mg/dL)');
+  if (stAU === 'Tinggi') kuning.push('Asam urat tinggi (' + String(p.au).replace('.', ',') + ' mg/dL)');
+  return { imt: imt, stIMT: stIMT, stLP: stLP, stTD: stTD, stGD: stGD, stKol: stKol, stAU: stAU,
     label: merah.length ? 'Merah' : kuning.length ? 'Kuning' : 'Hijau', alasan: merah.concat(kuning) };
 }
+/* Laboratorium sederhana (mg/dL). Gula darah: sewaktu >= 200 tinggi; puasa < 100 normal, 100–125 pra-diabetes, >= 126 tinggi.
+   Kolesterol total: < 200 normal, 200–239 batas tinggi, >= 240 tinggi. Asam urat: > 7 (laki-laki) / > 6 (perempuan) tinggi. */
+function statusGula(gd, jenis) {
+  var g = +gd; if (!(g > 0)) return '';
+  if (jenis === 'Puasa') return g >= 126 ? 'Tinggi' : g >= 100 ? 'Pra-diabetes' : 'Normal';
+  return g >= 200 ? 'Tinggi' : 'Normal';
+}
+function statusKolesterol(k) { var v = +k; if (!(v > 0)) return ''; return v >= 240 ? 'Tinggi' : v >= 200 ? 'Batas tinggi' : 'Normal'; }
+function statusAsamUrat(a, jk) { var v = +a; if (!(v > 0)) return ''; return v > (jk === 'L' ? 7 : 6) ? 'Tinggi' : 'Normal'; }
+
+/* ---------- Skrining berkala lansia (formulir resmi Kemenkes; kader mencatat hasilnya) ----------
+   SKILAS: enam ranah; "Y" = ada masalah (positif) → pemeriksaan lanjut di Puskesmas. Minimal setahun sekali.
+   AKS (indeks Barthel, skor 0–20): 20 mandiri, 12–19 ringan, 9–11 sedang, 5–8 berat, 0–4 total.
+   GDS-15 (gejala depresi): 0–4 normal, 5–8 ringan, 9–11 sedang, 12–15 berat.
+   AMT (fungsi kognitif, 0–10): 8–10 normal, 4–7 gangguan sedang, 0–3 gangguan berat. */
+var RANAH_SKILAS = [
+  { kode: 'kognitif', nama: 'Penurunan kognitif', tes: 'Mengingat tiga kata dan orientasi waktu & tempat' },
+  { kode: 'mobilitas', nama: 'Keterbatasan mobilisasi', tes: 'Berdiri dari kursi 5 kali tanpa bantuan tangan dalam 14 detik' },
+  { kode: 'malnutrisi', nama: 'Malnutrisi', tes: 'Berat badan turun > 3 kg dalam 3 bulan terakhir atau hilang nafsu makan' },
+  { kode: 'penglihatan', nama: 'Gangguan penglihatan', tes: 'Masalah melihat jauh, membaca, atau penyakit mata' },
+  { kode: 'pendengaran', nama: 'Gangguan pendengaran', tes: 'Tidak dapat mendengar saat tes bisik' },
+  { kode: 'depresi', nama: 'Gejala depresi', tes: 'Dua minggu terakhir merasa sedih/putus asa atau kehilangan minat' }
+];
+function kategoriAKS(s) { if (s === '' || s === null || s === undefined) return ''; s = +s; return s >= 20 ? 'Mandiri' : s >= 12 ? 'Ketergantungan ringan' : s >= 9 ? 'Ketergantungan sedang' : s >= 5 ? 'Ketergantungan berat' : 'Ketergantungan total'; }
+function kategoriGDS(s) { if (s === '' || s === null || s === undefined) return ''; s = +s; return s <= 4 ? 'Normal' : s <= 8 ? 'Depresi ringan' : s <= 11 ? 'Depresi sedang' : 'Depresi berat'; }
+function kategoriAMT(s) { if (s === '' || s === null || s === undefined) return ''; s = +s; return s >= 8 ? 'Normal' : s >= 4 ? 'Gangguan kognitif sedang' : 'Gangguan kognitif berat'; }
+/* d = {kognitif.., aks, gds, amt}. Hasil: kategori + daftar temuan + perlu rujuk */
+function hitungSkrining(d) {
+  var temuan = [];
+  RANAH_SKILAS.forEach(function (r) { if (d[r.kode] === 'Y') temuan.push('SKILAS: ' + r.nama.toLowerCase()); });
+  var kA = kategoriAKS(d.aks), kG = kategoriGDS(d.gds), kM = kategoriAMT(d.amt);
+  if (kA && kA !== 'Mandiri') temuan.push('AKS: ' + kA.toLowerCase());
+  if (kG && kG !== 'Normal') temuan.push('GDS: ' + kG.toLowerCase());
+  if (kM && kM !== 'Normal') temuan.push('AMT: ' + kM.toLowerCase());
+  return { katAKS: kA, katGDS: kG, katAMT: kM, temuan: temuan, perluRujuk: temuan.length > 0 };
+}
+function validasiSkrining(d) {
+  if (!d.tgl || isNaN(tglKeMs(d.tgl))) return 'Tanggal skrining wajib diisi.';
+  var ada = RANAH_SKILAS.some(function (r) { return d[r.kode] === 'Y' || d[r.kode] === 'T'; });
+  var cek = function (v, maks) { return v === '' || v === null || v === undefined || (+v >= 0 && +v <= maks && Math.floor(+v) === +v); };
+  if (!ada && d.aks === '' && d.gds === '' && d.amt === '') return 'Isi minimal satu hasil skrining.';
+  if (!cek(d.aks, 20)) return 'Skor AKS harus 0 sampai 20.';
+  if (!cek(d.gds, 15)) return 'Skor GDS harus 0 sampai 15.';
+  if (!cek(d.amt, 10)) return 'Skor AMT harus 0 sampai 10.';
+  return '';
+}
+var PENYULUHAN_LANSIA = ['Aktivitas fisik', 'Gizi seimbang', 'Berhenti merokok', 'Minum obat teratur', 'Cegah jatuh', 'Kesehatan jiwa & sosial', 'Kebersihan diri'];
 function validasiLansia(d) {
   if (!d.tgl || isNaN(tglKeMs(d.tgl))) return 'Tanggal pemeriksaan wajib diisi.';
   if (periodeDari(d.tgl) !== d.periode) return 'Tanggal pemeriksaan harus di dalam periode ' + namaPeriode(d.periode) + '.';
-  if (!(+d.bb > 0) && !(+d.tb > 0) && !(+d.lp > 0) && !(+d.sistol > 0) && !(+d.diastol > 0)) return 'Isi minimal satu hasil pemeriksaan.';
+  if (!(+d.bb > 0) && !(+d.tb > 0) && !(+d.lp > 0) && !(+d.sistol > 0) && !(+d.diastol > 0) && !(+d.gd > 0) && !(+d.kol > 0) && !(+d.au > 0)) return 'Isi minimal satu hasil pemeriksaan.';
+  if (+d.gd && (+d.gd < 20 || +d.gd > 600)) return 'Gula darah harus 20 sampai 600 mg/dL.';
+  if (+d.kol && (+d.kol < 50 || +d.kol > 500)) return 'Kolesterol harus 50 sampai 500 mg/dL.';
+  if (+d.au && (+d.au < 1 || +d.au > 20)) return 'Asam urat harus 1 sampai 20 mg/dL.';
   if (+d.bb && (+d.bb < 20 || +d.bb > 200)) return 'Berat badan harus 20 sampai 200 kg.';
   if (+d.tb && (+d.tb < 100 || +d.tb > 200)) return 'Tinggi badan harus 100 sampai 200 cm.';
   if (+d.lp && (+d.lp < 40 || +d.lp > 200)) return 'Lingkar perut harus 40 sampai 200 cm.';
@@ -295,5 +350,6 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = { hitungGizi: hitungGizi, hitungNT: hitungNT, hitungLabel: hitungLabel, skorRisiko: skorRisiko,
     validasiUkur: validasiUkur, peringatanUkur: peringatanUkur, statusImunisasi: statusImunisasi,
     periodeVitA: periodeVitA, geserPeriode: geserPeriode, akhirPeriode: akhirPeriode, usiaBulan: usiaBulan,
-    usiaKPSP: usiaKPSP, hasilKPSP: hasilKPSP, hitungLansia: hitungLansia, validasiLansia: validasiLansia };
+    usiaKPSP: usiaKPSP, hasilKPSP: hasilKPSP, hitungLansia: hitungLansia, validasiLansia: validasiLansia,
+    hitungSkrining: hitungSkrining, validasiSkrining: validasiSkrining };
 }
