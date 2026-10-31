@@ -209,9 +209,38 @@ function periodeVitA(p) {
 }
 function jenisVitA(usiaBln) { return usiaBln >= 6 && usiaBln <= 11 ? 'VitA_Biru' : usiaBln >= 12 && usiaBln <= 59 ? 'VitA_Merah' : ''; }
 
+/* ---------- Perkembangan (KPSP, pedoman SDIDTK Kemenkes) ----------
+   Kader memakai formulir KPSP resmi sesuai usia (10 pertanyaan), lalu mencatat jumlah jawaban "Ya".
+   Bila usia anak di antara dua jadwal, dipakai formulir usia di bawahnya. */
+var USIA_KPSP = [3, 6, 9, 12, 15, 18, 21, 24, 30, 36, 42, 48, 54, 60];
+function usiaKPSP(usiaBln) {
+  var u = 0;
+  for (var i = 0; i < USIA_KPSP.length; i++) if (USIA_KPSP[i] <= usiaBln) u = USIA_KPSP[i];
+  return u;
+}
+function hasilKPSP(jumlahYa) { var y = +jumlahYa; return y >= 9 ? 'Sesuai' : y >= 7 ? 'Meragukan' : 'Penyimpangan'; }
+var SARAN_KPSP = {
+  Sesuai: 'Perkembangan sesuai usia. Lanjutkan stimulasi sesuai usia; periksa lagi pada jadwal KPSP berikutnya.',
+  Meragukan: 'Ajari orang tua stimulasi sesuai usia, lalu periksa ulang KPSP 2 minggu lagi. Bila tetap meragukan, rujuk ke Puskesmas.',
+  Penyimpangan: 'Rujuk ke Puskesmas untuk pemeriksaan perkembangan lebih lanjut.'
+};
+
+/* ---------- Penyakit yang dapat dicegah dengan imunisasi (PD3I) ----------
+   Kriteria sederhana untuk kader melaporkan SUSPEK; kepastian oleh petugas kesehatan. */
+var PENYAKIT_PD3I = [
+  { kode: 'CAMPAK', nama: 'Campak-Rubela', ciri: 'Demam dan ruam (bintik merah) di kulit, disertai batuk, pilek, atau mata merah.', vaksin: ['MR1', 'MR2'] },
+  { kode: 'DIFTERI', nama: 'Difteri', ciri: 'Demam ringan dan sakit menelan dengan selaput putih keabuan di tenggorokan yang mudah berdarah; leher dapat bengkak.', vaksin: ['DPT1', 'DPT2', 'DPT3', 'DPT4'] },
+  { kode: 'PERTUSIS', nama: 'Pertusis (batuk rejan)', ciri: 'Batuk 2 minggu atau lebih, batuk beruntun diakhiri tarikan napas berbunyi atau muntah setelah batuk.', vaksin: ['DPT1', 'DPT2', 'DPT3', 'DPT4'] },
+  { kode: 'AFP', nama: 'Lumpuh layu mendadak (AFP/polio)', ciri: 'Kelumpuhan lemas pada lengan atau tungkai yang terjadi mendadak, bukan karena cedera.', vaksin: ['OPV1', 'OPV2', 'OPV3', 'OPV4', 'IPV1', 'IPV2'] },
+  { kode: 'TN', nama: 'Tetanus neonatorum', ciri: 'Bayi usia 3–28 hari yang semula bisa menyusu menjadi tidak bisa menyusu, kaku, atau kejang.', vaksin: [] },
+  { kode: 'LAIN', nama: 'PD3I lainnya', ciri: 'Gejala lain yang dicurigai penyakit yang dapat dicegah imunisasi (mis. hepatitis B, TBC berat, pneumonia berat).', vaksin: [] }
+];
+var STATUS_PD3I = ['Dilaporkan', 'Diperiksa nakes', 'Bukan kasus', 'Kasus', 'Selesai'];
+
 /* Agar bisa dipakai di Node (uji) tanpa mengganggu Apps Script/browser */
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { hitungGizi: hitungGizi, hitungNT: hitungNT, hitungLabel: hitungLabel, skorRisiko: skorRisiko,
     validasiUkur: validasiUkur, peringatanUkur: peringatanUkur, statusImunisasi: statusImunisasi,
-    periodeVitA: periodeVitA, geserPeriode: geserPeriode, akhirPeriode: akhirPeriode, usiaBulan: usiaBulan };
+    periodeVitA: periodeVitA, geserPeriode: geserPeriode, akhirPeriode: akhirPeriode, usiaBulan: usiaBulan,
+    usiaKPSP: usiaKPSP, hasilKPSP: hasilKPSP };
 }

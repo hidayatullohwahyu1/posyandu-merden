@@ -180,12 +180,16 @@ function olahData(raw) {
   raw.ukur.forEach(r => { const o = ob(raw.kolUkur, r); (ukur[o.id] = ukur[o.id] || {})[o.periode] = o; });
   raw.imun.forEach(r => { (imun[r[0]] = imun[r[0]] || {})[r[1]] = { tgl: r[2], id: r[3], tempat: r[4] }; });
   raw.vit.forEach(r => { (vit[r[0]] = vit[r[0]] || []).push({ periode: r[1], jenis: r[2], tgl: r[3], id: r[4] }); });
+  const lay = raw.layanan || { kpsp: [], pd3i: [] }, kpsp = {};
+  lay.kpsp.forEach(r => { (kpsp[r[0]] = kpsp[r[0]] || {})[r[1]] = kpspObj(r); });
   return {
     waktu: raw.waktu, waktuSinkron: Date.now(), user: raw.user, posyandu: raw.posyandu, desa: raw.desa,
     kolUkur: raw.kolUkur, balita: raw.balita.map(r => ob(raw.kolBalita, r)), ukur, imun, vit,
-    tl: raw.tl, usulan: raw.usulan, jadwal: raw.jadwal, kbm: raw.kbm, kunci: raw.kunci
+    tl: raw.tl, usulan: raw.usulan, jadwal: raw.jadwal, kbm: raw.kbm, kunci: raw.kunci, kpsp, pd3i: lay.pd3i.map(pd3iObj)
   };
 }
+const kpspObj = r => ({ usia: +r[1], tgl: r[2], ya: +r[3], hasil: r[4], tdd: r[5], tdl: r[6], catatan: r[7], id: r[8] });
+const pd3iObj = r => ({ idLapor: r[0], id: r[1], penyakit: r[2], tglGejala: r[3], gejala: r[4], imun: r[5], status: r[6], tl: r[7], pelapor: r[8], tglLapor: r[9] });
 function barisKeUkur(arr) { const o = {}; S.dasar.kolUkur.forEach((k, i) => { o[k] = arr[i]; }); return o; }
 
 /* Susun tampilan = data server + antrean yang belum terkirim */
@@ -193,6 +197,7 @@ function susunData() {
   if (!S.dasar) { S.d = null; return; }
   const d = typeof structuredClone === 'function' ? structuredClone(S.dasar) : JSON.parse(JSON.stringify(S.dasar));
   d.byId = {};
+  d.kpsp = d.kpsp || {}; d.pd3i = d.pd3i || [];   // data tersimpan dari versi lama
   d.balita.forEach(b => { d.byId[b.id] = b; });
   S.antrean.filter(it => it.status !== 'gagal').forEach(it => terapkanLokal(d, it));
   S.d = d;
@@ -263,6 +268,18 @@ function terapkanLokal(d, it) {
         b.tglKeluar = x.jenis === 'Masuk' ? '' : x.tanggal;
       } else d.usulan.push({ ID_Balita: b.id, Jenis: x.jenis, Alasan: x.alasan, Tanggal: x.tanggal, Status: 'Diusulkan', _lokal: true });
       break;
+    case 'simpanKPSP':
+      if (!b) return;
+      (d.kpsp[x.id] = d.kpsp[x.id] || {})[x.usiaKpsp] = { usia: x.usiaKpsp, tgl: x.tgl, ya: x.jumlahYa, hasil: hasilKPSP(x.jumlahYa),
+        tdd: x.tdd, tdl: x.tdl, catatan: x.catatan, _lokal: true };
+      break;
+    case 'laporPD3I': {
+      if (!b) return;
+      const lama = d.pd3i.find(z => z.idLapor === x.idLapor);
+      const baru = Object.assign({}, lama || { pelapor: S.sesi ? S.sesi.user.username : '', tglLapor: hariIni(), imun: '' },
+        { idLapor: x.idLapor, id: x.id, penyakit: x.penyakit, tglGejala: x.tglGejala, gejala: x.gejala, status: x.status || 'Dilaporkan', tl: x.tindakLanjut || '', _lokal: true });
+      d.pd3i = d.pd3i.filter(z => z !== lama).concat([baru]);
+      break; }
     case 'simpanTindakLanjut': {
       let t = d.tl.find(z => (x.idTL && z.ID === x.idTL) || (!x.idTL && z.ID_Balita === x.id && ['Belum', 'Sedang', 'Membaik'].indexOf(z.Status) >= 0));
       if (!t) { t = { ID: 'L-' + it.qid, ID_Balita: x.id, Tgl_Terdeteksi: hariIni(), Periode: periodeKini(), Label: x.label || 'Kuning', Alasan: x.alasan || '' }; d.tl.push(t); }
@@ -274,6 +291,8 @@ function terapkanLokal(d, it) {
 /* Balasan server untuk satu kiriman → perbarui S.dasar */
 function terimaHasil(it, h) {
   const D = S.dasar, x = it.data;
+  if (!D.kpsp) D.kpsp = {};
+  if (!D.pd3i) D.pd3i = [];
   const masihAda = S.antrean.some(o => o !== it && o.kunci && o.kunci === it.kunci && o.status !== 'gagal');
   switch (it.action) {
     case 'simpanPengukuran':
@@ -304,6 +323,8 @@ function terimaHasil(it, h) {
       else D.usulan.push({ ID: h.idMutasi, ID_Balita: x.id, Jenis: x.jenis, Alasan: x.alasan, Tanggal: x.tanggal, Status: 'Diusulkan' });
       break;
     case 'simpanTindakLanjut': tlMasuk(D, h); break;
+    case 'simpanKPSP': if (!masihAda) (D.kpsp[h[0]] = D.kpsp[h[0]] || {})[h[1]] = kpspObj(h); break;
+    case 'laporPD3I': if (!masihAda) D.pd3i = D.pd3i.filter(z => z.idLapor !== h[0]).concat([pd3iObj(h)]); break;
   }
 }
 function tlMasuk(D, t) {
@@ -334,6 +355,8 @@ function kunciAntrean(a, x) {
   if (a === 'simpanImunisasi' || a === 'hapusImunisasi') return 'imun|' + x.id + '|' + x.kode;
   if (a === 'simpanVitamin') return 'vit|' + x.id + '|' + x.jenis + '|' + x.tgl.slice(0, 7);
   if (a === 'simpanBalita') return 'balita|' + x.id;
+  if (a === 'simpanKPSP') return 'kpsp|' + x.id + '|' + x.usiaKpsp;
+  if (a === 'laporPD3I') return 'pd3i|' + x.idLapor;
   return '';
 }
 
@@ -624,6 +647,7 @@ function viewBeranda() {
     </div>
     ${S.swBaru ? `<div class="banner biru"><span class="bulat w-biru" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;color:#fff">${ikon('segar', 20)}</span><div class="isi"><b>Versi baru tersedia</b><div class="kecil">Perbarui untuk memakai perbaikan terbaru.</div></div><button class="tombol kecil" data-aksi="perbaruiApp">Perbarui</button></div>` : ''}
     ${S.pasang ? `<div class="banner biru"><span class="bulat w-tosca" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;color:#fff">${ikon('awan', 20)}</span><div class="isi"><b>Pasang di layar HP</b><div class="kecil">Agar cukup mengetuk ikon.</div></div><button class="tombol kecil" data-aksi="pasang">Pasang</button></div>` : ''}
+    ${pd3iAktif().length ? `<div class="pesan-galat"><b>${pd3iAktif().length} suspek PD3I aktif.</b> <a href="#/risiko">Lihat</a> — pastikan sudah diteruskan ke Puskesmas.</div>` : ''}
     ${g ? `<div class="pesan-galat">${g} kiriman ditolak server. <a href="#/antrean">Periksa</a></div>` : m ? `<div class="pesan-awas">${m} data belum terkirim. Akan terkirim otomatis saat ada sinyal.</div>` : ''}
     <div class="judul-bagian">Perlu perhatian</div>
     <div class="grid2">
@@ -831,6 +855,7 @@ function viewBalita(id) {
       ${vit.length ? vit.map(v => `<div class="vaksin"><div class="nm">${{ VitA_Biru: 'Vitamin A biru', VitA_Merah: 'Vitamin A merah', Obat_Cacing: 'Obat cacing' }[v.jenis]}${v._lokal ? ' ⏳' : ''}<small>${fmtTgl(v.tgl)} · periode ${namaPeriode(v.periode)}</small></div>
         <button class="tombol bahaya kecil" data-aksi="hapusVit" data-id="${esc(id)}" data-v="${esc(v.id)}">Hapus</button></div>`).join('') : '<div class="redup" style="margin-top:8px">Belum ada catatan.</div>'}
       ${si.usia >= 6 && si.usia <= 59 && !vitASudah(b, periodeVitA(P)) ? `<div class="pesan-awas" style="margin:10px 0 0">Belum menerima vitamin A periode ${namaPeriode(periodeVitA(P))}.</div>` : ''}</div>
+    ${kartuKPSP(b)}${kartuPD3I(b)}
     <div class="kartu"><div class="baris antara"><h2 style="margin:0">Tindak lanjut</h2><button class="tombol garis kecil" data-aksi="formTL" data-id="${esc(id)}">Catat</button></div>
       ${tl.length ? tl.slice().reverse().map(x => `<div class="vaksin"><div class="nm"><b>${esc(x.Status)}</b> · ${esc(x.Label)} · ${namaPeriode(String(x.Periode))}
         <small>${esc(x.Alasan)}</small>${x.Dirujuk_Ke ? `<small>Dirujuk ke ${esc(x.Dirujuk_Ke)} ${x.Tgl_Rujuk ? fmtTgl(x.Tgl_Rujuk) : ''}</small>` : ''}
@@ -934,19 +959,136 @@ function formMutasi(id) {
     </form>`);
 }
 
+/* ---------- Perkembangan (KPSP) ---------- */
+const WARNA_KPSP = { Sesuai: 'Hijau', Meragukan: 'Kuning', Penyimpangan: 'Merah' };
+/* Usia formulir KPSP yang sudah tercapai tetapi belum dicatat (0 = tidak ada) */
+function kpspTempo(b) {
+  const uk = usiaKPSP(usiaBulan(b.tglLahir, hariIni()));
+  return uk && !(S.d.kpsp[b.id] || {})[uk] ? uk : 0;
+}
+function kpspTerakhir(id) {
+  const l = Object.values(S.d.kpsp[id] || {});
+  return l.length ? l.reduce((a, c) => (c.usia > a.usia ? c : a)) : null;
+}
+function kpspPerlu() {
+  return sasaran(periodeKini()).map(b => ({ b, k: kpspTerakhir(b.id) })).filter(x => x.k && x.k.hasil !== 'Sesuai')
+    .sort((a, c) => (a.k.hasil === 'Penyimpangan' ? 0 : 1) - (c.k.hasil === 'Penyimpangan' ? 0 : 1) || urutNama(a.b, c.b));
+}
+function kartuKPSP(b) {
+  const usia = usiaBulan(b.tglLahir, hariIni()), tempo = kpspTempo(b);
+  const list = Object.values(S.d.kpsp[b.id] || {}).sort((a, c) => c.usia - a.usia);
+  return `<div class="kartu"><div class="baris antara"><h2 style="margin:0">Perkembangan (KPSP)</h2>
+      ${usia >= 3 ? `<button class="tombol garis kecil" data-aksi="formKPSP" data-id="${esc(b.id)}">Catat</button>` : ''}</div>
+    ${usia < 3 ? '<div class="redup" style="margin-top:8px">KPSP dimulai pada usia 3 bulan.</div>' : ''}
+    ${tempo ? `<div class="pesan-awas" style="margin:10px 0 0">KPSP ${tempo} bulan belum dicatat.</div>` : ''}
+    ${list.map(k => `<div class="vaksin"><div class="nm">KPSP ${k.usia} bulan${k._lokal ? ' ⏳' : ''}
+      <small>${fmtTgl(k.tgl)} · jawaban "Ya" ${k.ya}/10${k.tdd ? ' · daya dengar: ' + esc(k.tdd).toLowerCase() : ''}${k.tdl ? ' · daya lihat: ' + esc(k.tdl).toLowerCase() : ''}</small>
+      <small>${esc(SARAN_KPSP[k.hasil] || '')}</small>${k.catatan ? `<small>Catatan: ${esc(k.catatan)}</small>` : ''}</div>
+      <span class="lbl ${WARNA_KPSP[k.hasil] || 'Abu'}">${esc(k.hasil)}</span></div>`).join('')}
+    ${usia >= 3 && !list.length ? '<div class="redup" style="margin-top:8px">Belum ada catatan.</div>' : ''}</div>`;
+}
+function formKPSP(id) {
+  const b = S.d.byId[id], usia = usiaBulan(b.tglLahir, hariIni()), uk = usiaKPSP(usia);
+  if (!uk) { toast('KPSP dimulai pada usia 3 bulan.'); return; }
+  const ada = (S.d.kpsp[id] || {})[uk];
+  const pilih = (nama, nilai) => `<select name="${nama}">${[['', 'Tidak diperiksa'], ['Normal', 'Normal'], ['Curiga gangguan', 'Curiga gangguan']]
+    .map(o => `<option value="${o[0]}" ${nilai === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>`;
+  bukaLembar(`<h3>Perkembangan (KPSP)</h3><div class="redup kecil" style="margin-bottom:12px">${esc(b.nama)} · ${usiaTeks(usia)}</div>
+    <div class="pesan-info">Pakai <b>formulir KPSP ${uk} bulan</b> dari buku KIA atau pedoman SDIDTK. Tanyakan ke ibu atau minta anak melakukan tiap butir, lalu hitung jawaban "Ya".</div>
+    <form id="fKPSP" data-id="${esc(id)}">
+      <div class="grid2">
+        <label class="isian"><span>Formulir KPSP usia</span><select name="usiaKpsp">${USIA_KPSP.filter(u => u <= usia).reverse()
+          .map(u => `<option value="${u}" ${u === uk ? 'selected' : ''}>${u} bulan</option>`).join('')}</select></label>
+        <label class="isian"><span>Tanggal pemeriksaan</span><input type="date" name="tgl" value="${ada ? ada.tgl : hariIni()}" min="${b.tglLahir}" max="${hariIni()}" required></label>
+      </div>
+      <label class="isian"><span>Jumlah jawaban "Ya" (dari 10 pertanyaan)</span><select name="jumlahYa"><option value="">Pilih…</option>
+        ${[10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map(n => `<option value="${n}" ${ada && ada.ya === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+      <div id="hasilKPSP"></div>
+      <div class="grid2">
+        <label class="isian"><span>Tes daya dengar (TDD)</span>${pilih('tdd', ada ? ada.tdd : '')}</label>
+        <label class="isian"><span>Tes daya lihat (TDL)</span>${pilih('tdl', ada ? ada.tdl : '')}</label>
+      </div>
+      <label class="isian"><span>Catatan (butir yang dijawab "Tidak", stimulasi yang diajarkan)</span><input name="catatan" maxlength="200" value="${ada ? esc(ada.catatan) : ''}"></label>
+      <div id="galatKPSP"></div>
+      <button class="tombol penuh" type="submit">Simpan</button>
+      <button type="button" class="tombol garis penuh" style="margin-top:10px" data-aksi="tutup">Batal</button>
+    </form>`, el => {
+    const s = el.querySelector('[name=jumlahYa]'), out = el.querySelector('#hasilKPSP');
+    const tampil = () => { if (s.value === '') { out.innerHTML = ''; return; } const h = hasilKPSP(+s.value);
+      out.innerHTML = `<div class="hasil ${WARNA_KPSP[h]}"><b>${h}</b><div class="kecil">${esc(SARAN_KPSP[h])}</div></div>`; };
+    s.addEventListener('change', tampil); tampil();
+  });
+}
+
+/* ---------- PD3I (suspek penyakit yang dapat dicegah imunisasi) ---------- */
+const STATUS_AKTIF_PD3I = ['Dilaporkan', 'Diperiksa nakes', 'Kasus'];
+const WARNA_PD3I = { Dilaporkan: 'Merah', 'Diperiksa nakes': 'Biru', Kasus: 'Merah', 'Bukan kasus': 'Abu', Selesai: 'Hijau' };
+const namaPD3I = k => (PENYAKIT_PD3I.find(p => p.kode === k) || { nama: k }).nama;
+function pd3iAktif() {
+  return (S.d.pd3i || []).filter(x => STATUS_AKTIF_PD3I.indexOf(x.status) >= 0 && S.d.byId[x.id] && posTerpilih(S.d.byId[x.id]))
+    .sort((a, c) => (a.tglGejala < c.tglGejala ? 1 : -1));
+}
+function imunTerkaitTeks(id, kode) {
+  const p = PENYAKIT_PD3I.find(x => x.kode === kode);
+  if (!p || !p.vaksin.length) return '';
+  const im = S.d.imun[id] || {};
+  return p.vaksin.map(k => k + ' ' + (im[k] ? fmtTgl(im[k].tgl) : 'belum')).join('; ');
+}
+const itemPD3I = x => { const b = S.d.byId[x.id]; return `<button class="item" data-aksi="formPD3I" data-id="${esc(x.id)}" data-lapor="${esc(x.idLapor)}">
+  <span class="avatar ${b.jk}">${esc(inisial(b.nama))}</span><span class="isi"><div class="nama">${esc(b.nama)}${x._lokal ? ' ⏳' : ''}</div>
+  <div class="sub">Suspek ${esc(namaPD3I(x.penyakit))} · gejala sejak ${fmtTgl(x.tglGejala)}</div>
+  <div class="sub">Ibu ${esc(b.ibu || '–')} · ${rtRw(b)}${admin() && !S.pos ? ' · ' + esc(b.posyandu) : ''}</div></span>
+  <span class="lbl ${WARNA_PD3I[x.status] || 'Abu'}">${esc(x.status)}</span></button>`; };
+function kartuPD3I(b) {
+  const list = (S.d.pd3i || []).filter(x => x.id === b.id).sort((a, c) => (a.tglGejala < c.tglGejala ? 1 : -1));
+  return `<div class="kartu"><div class="baris antara"><h2 style="margin:0">Suspek PD3I</h2>
+      <button class="tombol garis kecil" data-aksi="formPD3I" data-id="${esc(b.id)}">Laporkan</button></div>
+    ${list.length ? list.map(x => `<div class="vaksin bisa-ketuk" data-aksi="formPD3I" data-id="${esc(b.id)}" data-lapor="${esc(x.idLapor)}"><div class="nm">${esc(namaPD3I(x.penyakit))}${x._lokal ? ' ⏳' : ''}
+      <small>Gejala sejak ${fmtTgl(x.tglGejala)}${x.gejala ? ' · ' + esc(x.gejala) : ''}</small>${x.tl ? `<small>Tindak lanjut: ${esc(x.tl)}</small>` : ''}</div>
+      <span class="lbl ${WARNA_PD3I[x.status] || 'Abu'}">${esc(x.status)}</span></div>`).join('')
+      : '<div class="redup" style="margin-top:8px">Tidak ada laporan. Laporkan bila anak menunjukkan gejala campak, difteri, batuk rejan, lumpuh layu, atau tetanus pada bayi.</div>'}</div>`;
+}
+function formPD3I(id, idLapor) {
+  const b = S.d.byId[id], ada = idLapor ? (S.d.pd3i || []).find(x => x.idLapor === idLapor) : null;
+  bukaLembar(`<h3>${ada ? 'Laporan suspek PD3I' : 'Laporkan suspek PD3I'}</h3>
+    <div class="redup kecil" style="margin-bottom:12px">${esc(b.nama)} · ${usiaTeks(usiaBulan(b.tglLahir, hariIni()))} · Ibu ${esc(b.ibu || '–')} · ${rtRw(b)}</div>
+    ${ada ? '' : '<div class="pesan-awas">Laporkan paling lambat 24 jam sejak gejala diketahui, dan minta orang tua segera membawa anak ke bidan desa atau Puskesmas.</div>'}
+    <form id="fPD3I" data-id="${esc(id)}" data-lapor="${ada ? esc(ada.idLapor) : ''}">
+      <label class="isian"><span>Dicurigai</span><select name="penyakit"><option value="">Pilih…</option>${PENYAKIT_PD3I.map(p =>
+        `<option value="${p.kode}" ${ada && ada.penyakit === p.kode ? 'selected' : ''}>${esc(p.nama)}</option>`).join('')}</select></label>
+      <div id="ciriPD3I"></div>
+      <label class="isian"><span>Tanggal mulai gejala</span><input type="date" name="tglGejala" value="${ada ? ada.tglGejala : hariIni()}" min="${b.tglLahir}" max="${hariIni()}" required></label>
+      <label class="isian"><span>Gejala yang terlihat / keterangan</span><textarea name="gejala" maxlength="300">${ada ? esc(ada.gejala) : ''}</textarea></label>
+      ${ada ? `<div class="grid2"><label class="isian"><span>Status</span><select name="status">${STATUS_PD3I.map(s => `<option ${ada.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+        <div class="isian"><span class="redup kecil">Dilaporkan ${fmtTgl(ada.tglLapor)} oleh ${esc(ada.pelapor || '–')}</span></div></div>
+        <label class="isian"><span>Tindak lanjut (hasil pemeriksaan nakes, rujukan, sampel)</span><textarea name="tindakLanjut" maxlength="300">${esc(ada.tl || '')}</textarea></label>` : ''}
+      <div id="galatPD3I"></div>
+      <button class="tombol ${ada ? '' : 'bahaya '}penuh" type="submit">${ada ? 'Simpan' : 'Kirim laporan'}</button>
+      <button type="button" class="tombol garis penuh" style="margin-top:10px" data-aksi="tutup">Batal</button>
+      <p class="redup kecil">Laporan ini suspek (dugaan). Kepastian diagnosis oleh petugas kesehatan.</p>
+    </form>`, el => {
+    const s = el.querySelector('[name=penyakit]'), out = el.querySelector('#ciriPD3I');
+    const tampil = () => { const p = PENYAKIT_PD3I.find(x => x.kode === s.value); const im = p ? imunTerkaitTeks(id, p.kode) : '';
+      out.innerHTML = p ? `<div class="pesan-info"><b>Ciri:</b> ${esc(p.ciri)}${im ? `<br><b>Imunisasi terkait:</b> ${esc(im)}` : ''}</div>` : ''; };
+    s.addEventListener('change', tampil); tampil();
+  });
+}
+
 /* ---------- Imunisasi ---------- */
 function viewImunisasi() {
   const P = periodeKini(), perVit = periodeVitA(P), sas = sasaran(P);
   let list = [];
-  if (S.tabImun === 'Vitamin A') list = sas.filter(b => { const u = usiaBulan(b.tglLahir, hariIni()); return u >= 6 && u <= 59 && !vitASudah(b, perVit); })
+  if (S.tabImun === 'KPSP') list = sas.map(b => ({ b, uk: kpspTempo(b) })).filter(x => x.uk).map(x => ({ b: x.b, ket: 'KPSP ' + x.uk + ' bulan' }));
+  else if (S.tabImun === 'Vitamin A') list = sas.filter(b => { const u = usiaBulan(b.tglLahir, hariIni()); return u >= 6 && u <= 59 && !vitASudah(b, perVit); })
     .map(b => ({ b, ket: jenisVitA(usiaBulan(b.tglLahir, hariIni())) === 'VitA_Biru' ? 'Kapsul biru' : 'Kapsul merah' }));
   else list = sas.map(b => ({ b, v: statusImun(b).list.filter(x => x.status === S.tabImun) })).filter(x => x.v.length)
     .map(x => ({ b: x.b, ket: x.v.map(v => v.nama).join(', ') }));
   list.sort((a, c) => urutNama(a.b, c.b));
   return { judul: 'Imunisasi & Vitamin', html: `
     ${admin() ? pilihPosyandu() : ''}
-    <div class="chips">${['Jatuh tempo', 'Terlambat', 'Vitamin A'].map(t => `<button class="chip ${S.tabImun === t ? 'aktif' : ''}" data-aksi="tabImun" data-t="${t}">${t}</button>`).join('')}</div>
+    <div class="chips" style="flex-wrap:wrap">${['Jatuh tempo', 'Terlambat', 'Vitamin A', 'KPSP'].map(t => `<button class="chip ${S.tabImun === t ? 'aktif' : ''}" data-aksi="tabImun" data-t="${t}">${t}</button>`).join('')}</div>
     ${S.tabImun === 'Vitamin A' ? `<div class="pesan-info">Periode vitamin A: ${namaPeriode(perVit)} (Februari dan Agustus). Daftar ini anak 6–59 bulan yang belum tercatat.</div>`
+      : S.tabImun === 'KPSP' ? '<div class="pesan-info">Anak yang jadwal KPSP (pemeriksaan perkembangan) usianya sudah tercapai tetapi belum dicatat.</div>'
       : S.tabImun === 'Terlambat' ? '<div class="pesan-info">Lewat usia jadwal: perlu imunisasi kejar. Konsultasikan dengan bidan desa.</div>' : ''}
     <div class="baris antara" style="margin:0 4px 8px"><span class="redup kecil">${list.length} balita</span>
       ${list.length ? '<button class="tombol garis kecil" data-aksi="salinWA">Salin untuk WhatsApp</button>' : ''}</div>
@@ -970,7 +1112,13 @@ function viewRisiko() {
   return { judul: 'Risiko & Tindak Lanjut', html: `
     ${admin() ? pilihPosyandu() : ''}
     <div class="pesan-info">Berdasarkan pengukuran ${namaPeriode(periodeKini())} (atau bulan lalu bila belum diukur). Ketuk nama untuk mencatat rujukan dan intervensi.</div>
+    ${pd3iAktif().length ? `<div class="judul-bagian" style="color:var(--merah)">Suspek PD3I aktif (${pd3iAktif().length})</div><div class="daftar">${pd3iAktif().map(itemPD3I).join('')}</div>` : ''}
     ${bagian('Merah — perlu rujukan', r.Merah)}${bagian('Kuning — waspada', r.Kuning)}${bagian('Tidak ditimbang 2 bulan atau lebih', r.Absen, true)}
+    ${(() => { const l = kpspPerlu(); return `<div class="judul-bagian">Perkembangan perlu tindak lanjut (${l.length})</div>` + (l.length ? `<div class="daftar">${l.map(x => `<button class="item" data-aksi="ke" data-ke="balita/${esc(x.b.id)}">
+      <span class="avatar ${x.b.jk}">${esc(inisial(x.b.nama))}</span><span class="isi"><div class="nama">${esc(x.b.nama)}</div>
+      <div class="sub">KPSP ${x.k.usia} bulan · ${fmtTgl(x.k.tgl)} · ${x.k.hasil === 'Meragukan' ? 'periksa ulang 2 minggu' : 'rujuk ke Puskesmas'}</div>
+      <div class="sub">Ibu ${esc(x.b.ibu || '–')} · ${rtRw(x.b)}${admin() && !S.pos ? ' · ' + esc(x.b.posyandu) : ''}</div></span>
+      <span class="lbl ${WARNA_KPSP[x.k.hasil]}">${x.k.hasil}</span></button>`).join('')}</div>` : '<div class="kosong" style="padding:14px">Tidak ada.</div>'); })()}
     <p class="redup kecil">Label adalah penanda dini. Penentuan status dan penanganan oleh tenaga kesehatan.</p>` };
 }
 
@@ -1129,6 +1277,8 @@ function viewDashboard() {
         <div class="angka merah"><b>${t.Merah}</b><span>Label merah</span></div>
         <div class="angka ${d.tlTerlambat ? 'merah' : ''}"><b>${d.tlTerlambat}</b><span>Merah belum ditangani &gt; 14 hari</span></div>
         <button class="angka ${d.menunggu ? 'kuning' : ''}" data-aksi="ke" data-ke="persetujuan"><b>${d.menunggu}</b><span>Menunggu persetujuan</span></button>
+        <button class="angka ${d.pd3iAktif ? 'merah' : ''}" data-aksi="ke" data-ke="risiko"><b>${d.pd3iAktif || 0}</b><span>Suspek PD3I aktif</span></button>
+        <button class="angka ${d.kpspPerluRujuk ? 'kuning' : ''}" data-aksi="ke" data-ke="risiko"><b>${d.kpspPerluRujuk || 0}</b><span>KPSP meragukan/penyimpangan</span></button>
       </div>
       <div class="kartu" style="margin-top:12px"><h2>Tren 12 bulan</h2>${grafikTren(d.tren)}</div>
       <div class="kartu"><h2>Per posyandu</h2><div class="tabel-wrap"><table>
@@ -1345,6 +1495,8 @@ const AKSI = {
   formImun: el => formImun(el.dataset.id, el.dataset.k),
   formVit: el => formVit(el.dataset.id),
   formTL: el => formTL(el.dataset.id),
+  formKPSP: el => formKPSP(el.dataset.id),
+  formPD3I: el => formPD3I(el.dataset.id, el.dataset.lapor),
   mutasi: el => formMutasi(el.dataset.id),
   formUser: el => formUser(el.dataset.i !== undefined ? +el.dataset.i : undefined),
   hapusUkur: async () => {
@@ -1380,7 +1532,7 @@ const AKSI = {
   },
   salinWA: async () => {
     const v = viewImunisasi(), P = periodeKini();
-    const teks = `*${S.tabImun === 'Vitamin A' ? 'Sasaran Vitamin A ' + namaPeriode(periodeVitA(P)) : 'Imunisasi ' + S.tabImun.toLowerCase()}* — ${admin() && !S.pos ? S.d.desa : 'Posyandu ' + (S.pos || S.d.user.posyandu)}\n` +
+    const teks = `*${S.tabImun === 'KPSP' ? 'Jadwal KPSP (perkembangan)' : S.tabImun === 'Vitamin A' ? 'Sasaran Vitamin A ' + namaPeriode(periodeVitA(P)) : 'Imunisasi ' + S.tabImun.toLowerCase()}* — ${admin() && !S.pos ? S.d.desa : 'Posyandu ' + (S.pos || S.d.user.posyandu)}\n` +
       v.data.map((x, i) => `${i + 1}. ${x.b.nama} (${rtRw(x.b)}, ibu ${x.b.ibu || '-'}) — ${x.ket}`).join('\n');
     try { await navigator.clipboard.writeText(teks); toast('Daftar disalin. Tempel di WhatsApp.'); }
     catch (e) { bukaLembar(`<h3>Salin teks</h3><textarea style="min-height:240px">${esc(teks)}</textarea>`); }
@@ -1466,6 +1618,26 @@ const KIRIM = {
     if (!cocok && !await konfirmasi('Periksa jenis dan usia', `Anak berusia ${usiaTeks(usia)} pada tanggal pemberian, sedangkan anjurannya ${anjuran}. Tetap simpan?`, 'Tetap simpan')) return;
     await antrekan('simpanVitamin', { id: f.dataset.id, jenis: f.jenis.value, tgl: f.tgl.value }, 'Vitamin/obat cacing ' + b.nama);
     tutupLembar(); render(); toast('Tercatat.');
+  },
+  fKPSP: async f => {
+    const b = S.d.byId[f.dataset.id];
+    if (f.jumlahYa.value === '') { $('#galatKPSP').innerHTML = '<div class="pesan-galat">Pilih jumlah jawaban "Ya".</div>'; return; }
+    if (!f.tgl.value || f.tgl.value < b.tglLahir || f.tgl.value > hariIni()) { $('#galatKPSP').innerHTML = '<div class="pesan-galat">Tanggal tidak valid.</div>'; return; }
+    const x = { id: b.id, tgl: f.tgl.value, usiaKpsp: +f.usiaKpsp.value, jumlahYa: +f.jumlahYa.value, tdd: f.tdd.value, tdl: f.tdl.value, catatan: rapiSpasi(f.catatan.value) };
+    await antrekan('simpanKPSP', x, 'KPSP ' + x.usiaKpsp + ' bln ' + b.nama);
+    tutupLembar(); render();
+    toast('KPSP tercatat: ' + hasilKPSP(x.jumlahYa) + '.' + (hasilKPSP(x.jumlahYa) === 'Sesuai' ? '' : ' ' + SARAN_KPSP[hasilKPSP(x.jumlahYa)]), 6000);
+  },
+  fPD3I: async f => {
+    const b = S.d.byId[f.dataset.id];
+    if (!f.penyakit.value) { $('#galatPD3I').innerHTML = '<div class="pesan-galat">Pilih jenis penyakit.</div>'; return; }
+    if (!f.tglGejala.value || f.tglGejala.value < b.tglLahir || f.tglGejala.value > hariIni()) { $('#galatPD3I').innerHTML = '<div class="pesan-galat">Tanggal mulai gejala tidak valid.</div>'; return; }
+    const baru = !f.dataset.lapor;
+    if (baru && !await konfirmasi('Kirim laporan suspek?', 'Laporan akan diteruskan ke admin desa. Pastikan anak segera diperiksa bidan desa atau Puskesmas.', 'Kirim laporan')) return;
+    const x = { idLapor: f.dataset.lapor || idBaru('PD3I-'), id: b.id, penyakit: f.penyakit.value, tglGejala: f.tglGejala.value, gejala: rapiSpasi(f.gejala.value),
+      status: f.status ? f.status.value : 'Dilaporkan', tindakLanjut: f.tindakLanjut ? rapiSpasi(f.tindakLanjut.value) : '' };
+    await antrekan('laporPD3I', x, (baru ? 'Lapor PD3I ' : 'Ubah PD3I ') + b.nama);
+    tutupLembar(); render(); toast(baru ? 'Laporan suspek PD3I tersimpan dan dikirim ke admin.' : 'Laporan diperbarui.', 5000);
   },
   fTL: async f => {
     const b = S.d.byId[f.dataset.id];
