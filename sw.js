@@ -1,6 +1,6 @@
 /* Service worker: menyimpan file aplikasi di HP agar bisa dibuka tanpa sinyal.
    NAIKKAN VERSI setiap kali ada file yang diubah, supaya HP kader mendapat versi baru. */
-const VERSI = 'pm-v1.7.0';
+const VERSI = 'pm-v1.8.0';
 const FILE = ['./', './index.html', './styles.css', './config.js', './who.js', './gizi.js', './db.js', './app.js',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png'];
 

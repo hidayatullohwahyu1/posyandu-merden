@@ -79,7 +79,7 @@ async function sha12(teks) {
 const IKON = {
   rumah: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   ukur: '<path d="M4 20V4m0 16h16M8 16l3-4 3 2 4-6"/>',
-  suntik: '<path d="M18 2l4 4m-6-2l4 4M12 6l6 6-8 8H4v-6zM9 9l2 2m-5 1l2 2"/>',
+  suntik: '<path d="M18 2l4 4M15.5 4.5l4 4M17.5 6.5L8 16l-3.5.5L5 13l9.5-9.5M11 8l2 2M8.5 10.5l2 2M5 19l-3 3"/>',
   awas: '<path d="M12 3l10 18H2zM12 10v5m0 3v.5"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   cari: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
@@ -98,7 +98,11 @@ const IKON = {
   batang: '<path d="M5 20V11M11 20V5M17 20v-7M3 20h18"/>',
   akun: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
   bayi: '<circle cx="12" cy="7" r="3.5"/><path d="M6.5 21v-3.5a5.5 5.5 0 0 1 11 0V21M9 21v-3M15 21v-3"/>',
-  setuju: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.2l2.4 2.4 4.8-5"/>'
+  setuju: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.2l2.4 2.4 4.8-5"/>',
+  lansia: '<circle cx="10" cy="5" r="2.5"/><path d="M10 8.5l-2 5 3 2.5V21M8 13.5L6 21M10 8.5l3 3h3M17 11.5V21"/>',
+  buku: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/>',
+  nadi: '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+  daftar: '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>'
 };
 const ikon = (n, s = 24) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IKON[n]}</svg>`;
 
@@ -628,7 +632,7 @@ function viewLogin() {
     <div class="login-atas">
       <img class="logo-besar" src="icons/icon-192.png" alt="">
       <h1>${esc(C.NAMA)}</h1>
-      <p>Pemantauan pertumbuhan balita ${esc(C.DESA)}</p>
+      <p>Layanan posyandu ILP balita &amp; lansia ${esc(C.DESA)}</p>
     </div>
     <div class="login-kartu">
     <h2 style="margin:0 0 14px;font-size:1.1rem">Masuk ke akun Anda</h2>
@@ -682,25 +686,37 @@ function viewBeranda() {
   const salam = jam < 4 ? 'Selamat malam' : jam < 11 ? 'Selamat pagi' : jam < 15 ? 'Selamat siang' : jam < 18 ? 'Selamat sore' : 'Selamat malam';
   const bdg = n => n ? `<span class="bdg">${n > 99 ? '99+' : n}</span>` : '';
   const tombolBulat = (aksi, ke, warna, ik, teks, n) => `<button data-aksi="${aksi}" data-ke="${ke}"><span class="bulat ${warna}">${ikon(ik, 24)}</span>${teks}${bdg(n)}</button>`;
-  const layanan = [
+  const sl = sasaranLansia(), sdL = sl.filter(l => periksaDi(l.id, P)).length, pctL = sl.length ? Math.round(sdL / sl.length * 100) : 0;
+  const skrTempo = sl.filter(l => skriningTempo(l.id)).length;
+  const layananBalita = [
     ['ke', 'imunisasi', 'w-biru', 'suntik', 'Imunisasi'],
     ['keVitA', '', 'w-oranye', 'kapsul', 'Vitamin A'],
+    ['ke', 'data-balita', 'w-tosca', 'daftar', 'Data balita'],
+    ['ke', 'tambah-balita', 'w-pink', 'bayi', 'Tambah balita']
+  ];
+  const layananLansia = [
+    ['ke', 'lansia', 'w-hijau', 'nadi', 'Periksa lansia'],
+    ['keSkrining', '', 'w-ungu', 'papan', 'Skrining', skrTempo],
+    ['ke', 'tambah-lansia', 'w-pink', 'lansia', 'Tambah lansia'],
+    ['ke', 'materi-lansia', 'w-oranye', 'buku', 'Penyuluhan']
+  ];
+  const layananUmum = [
     ['ke', 'risiko', 'w-merah', 'awas', 'Risiko'],
-    ['ke', 'lansia', 'w-hijau', 'orang', 'Lansia'],
-    ['ke', 'data-balita', 'w-tosca', 'orang', 'Data balita'],
-    ['ke', 'tambah-balita', 'w-pink', 'bayi', 'Tambah balita'],
     ['ke', 'antrean', 'w-ungu', 'awan', 'Antrean', m + g],
     ['ke', 'akun', 'w-abu', 'gembok', 'Ganti PIN'],
-    ['ke', 'menu', 'w-hijau', 'menu', 'Lainnya']
+    ['ke', 'menu', 'w-biru', 'menu', 'Lainnya']
   ];
   const layananAdmin = [
-    ['ke', 'pantau', 'w-tosca', 'papan', 'Pantau timbang'],
+    ['ke', 'pantau', 'w-tosca', 'papan', 'Pantau'],
     ['ke', 'dashboard', 'w-biru', 'batang', 'Dashboard'],
     ['ke', 'persetujuan', 'w-kuning', 'setuju', 'Persetujuan', menunggu],
-    ['ke', 'laporan', 'w-hijau', 'dokumen', 'Laporan Excel'],
+    ['ke', 'laporan', 'w-hijau', 'dokumen', 'Laporan'],
     ['ke', 'pengguna', 'w-ungu', 'akun', 'Akun kader'],
-    ['ke', 'kunci', 'w-abu', 'gembok', 'Kunci periode']
+    ['ke', 'kunci', 'w-abu', 'gembok', 'Kunci periode'],
+    ['ke', 'data-balita', 'w-tosca', 'daftar', 'Data balita'],
+    ['sinkron', '', 'w-oranye', 'segar', 'Sinkron']
   ];
+  const grup = (judul, l) => `<div class="layanan"><div class="layanan-judul">${judul}</div>${l.map(x => tombolBulat(x[0], x[1], x[2], x[3], x[4], x[5])).join('')}</div>`;
   return { judul: C.NAMA, hero: true, html: `
     <div class="hero">
       <div class="salam">${salam},</div>
@@ -724,21 +740,30 @@ function viewBeranda() {
     ${S.pasang ? `<div class="banner biru"><span class="bulat w-tosca" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;color:#fff">${ikon('awan', 20)}</span><div class="isi"><b>Pasang di layar HP</b><div class="kecil">Agar cukup mengetuk ikon.</div></div><button class="tombol kecil" data-aksi="pasang">Pasang</button></div>` : ''}
     ${pd3iAktif().length ? `<div class="pesan-galat"><b>${pd3iAktif().length} suspek PD3I aktif.</b> <a href="#/risiko">Lihat</a> — pastikan sudah diteruskan ke Puskesmas.</div>` : ''}
     ${g ? `<div class="pesan-galat">${g} kiriman ditolak server. <a href="#/antrean">Periksa</a></div>` : m ? `<div class="pesan-awas">${m} data belum terkirim. Akan terkirim otomatis saat ada sinyal.</div>` : ''}
-    ${(() => { const sl = sasaranLansia(), sd = sl.filter(l => periksaDi(l.id, P)).length, pl = sl.length ? Math.round(sd / sl.length * 100) : 0;
-      return sl.length ? `<button class="kartu" data-aksi="ke" data-ke="lansia" style="display:block;width:100%;text-align:left;border:0;cursor:pointer">
-        <div class="baris antara"><span class="label-kecil">Pemeriksaan lansia ${esc(namaPeriode(P))}</span><span class="persen">${pl}%</span></div>
-        <div class="besar">${sd} <small>/ ${sl.length} lansia</small></div><div class="progres"><i style="width:${pl}%"></i></div>
-        <div class="redup kecil">${sl.length - sd ? (sl.length - sd) + ' lansia belum diperiksa bulan ini' : 'Semua lansia sudah diperiksa.'}</div></button>` : ''; })()}
+    ${sl.length ? `<div class="hero-kartu lansia">
+      <div class="baris antara"><span class="label-kecil">Pemeriksaan lansia ${esc(namaPeriode(P))}</span><span class="persen">${pctL}%</span></div>
+      <div class="besar">${sdL} <small>/ ${sl.length} lansia</small></div>
+      <div class="progres"><i style="width:${pctL}%"></i></div>
+      <div class="redup kecil">${sl.length - sdL ? (sl.length - sdL) + ' lansia belum diperiksa bulan ini' : 'Semua lansia sudah diperiksa. Terima kasih!'}</div>
+      <div class="aksi-cepat">
+        ${tombolBulat('ke', 'lansia', 'w-hijau', 'nadi', 'Periksa')}
+        ${tombolBulat('ke', 'tambah-lansia', 'w-pink', 'tambah', 'Tambah')}
+        ${tombolBulat('keSkrining', '', 'w-ungu', 'papan', 'Skrining', skrTempo)}
+        ${tombolBulat('ke', 'materi-lansia', 'w-oranye', 'buku', 'Penyuluhan')}
+      </div>
+    </div>` : ''}
     <div class="judul-bagian">Perlu perhatian</div>
     <div class="grid2">
-      <button class="ubin merah" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('awas', 22)}</span><span><b>${ris.Merah.length}</b><span>Perlu rujukan</span></span></button>
-      <button class="ubin kuning" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('jam', 22)}</span><span><b>${ris.Kuning.length}</b><span>Waspada</span></span></button>
-      <button class="ubin biru" data-aksi="ke" data-ke="imunisasi"><span class="ik">${ikon('suntik', 22)}</span><span><b>${imunJT}</b><span>Jatuh tempo imunisasi</span></span></button>
-      <button class="ubin ungu" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('orang', 22)}</span><span><b>${ris.Absen.length}</b><span>Tidak ditimbang ≥ 2 bln</span></span></button>
+      <button class="ubin merah" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('awas', 22)}</span><span><b>${ris.Merah.length}</b><span>Balita perlu rujukan</span></span></button>
+      <button class="ubin kuning" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('jam', 22)}</span><span><b>${ris.Kuning.length}</b><span>Balita waspada</span></span></button>
+      <button class="ubin biru" data-aksi="ke" data-ke="imunisasi"><span class="ik">${ikon('suntik', 22)}</span><span><b>${imunJT}</b><span>Imunisasi jatuh tempo</span></span></button>
+      <button class="ubin ungu" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('jam', 22)}</span><span><b>${ris.Absen.length}</b><span>Absen timbang ≥ 2 bulan</span></span></button>
+      ${sl.length ? `<button class="ubin merah" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('nadi', 22)}</span><span><b>${lansiaMerah().length}</b><span>Lansia perlu rujukan</span></span></button>
+      <button class="ubin kuning" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('papan', 22)}</span><span><b>${lansiaPerluSkrining().length}</b><span>Temuan skrining lansia</span></span></button>` : ''}
     </div>
     <div class="judul-bagian">Layanan</div>
-    <div class="layanan">${layanan.map(x => tombolBulat(x[0], x[1], x[2], x[3], x[4], x[5])).join('')}</div>
-    ${admin() ? `<div class="judul-bagian">Admin desa</div><div class="layanan">${layananAdmin.map(x => tombolBulat(x[0], x[1], x[2], x[3], x[4], x[5])).join('')}</div>` : ''}
+    ${grup('Balita', layananBalita)}${grup('Lansia', layananLansia)}${grup('Umum', layananUmum)}
+    ${admin() ? `<div class="judul-bagian">Admin desa</div>${grup('Pemantauan & pengaturan', layananAdmin)}` : ''}
     <p class="info-sinkron">Sinkron terakhir: ${menitSinkron < 1 ? 'baru saja' : menitSinkron < 60 ? menitSinkron + ' menit lalu' : fmtTgl(String(S.dasar.waktu).slice(0, 10))}</p>` };
 }
 
@@ -787,7 +812,7 @@ async function isiDaftarUkur() {
     const u = ukurDi(b.id, p);
     return `<button class="item" data-aksi="formUkur" data-id="${esc(b.id)}">
       <span class="avatar ${b.jk}">${esc(inisial(b.nama))}</span>
-      <span class="isi"><div class="nama">${esc(b.nama)}</div><div class="sub">${usiaTeks(usiaBulan(b.tglLahir, akhirPeriode(p) > hariIni() ? hariIni() : akhirPeriode(p)))} · Ibu ${esc(b.ibu || '–')} · ${rtRw(b)}${admin() && !S.pos ? ' · ' + esc(b.posyandu) : ''}</div></span>
+      <span class="isi"><div class="nama">${esc(b.nama)}</div><div class="sub">${usiaTeks(usiaBulan(b.tglLahir, akhirPeriode(p) > hariIni() ? hariIni() : akhirPeriode(p)))} · ${rtRw(b)}${admin() && !S.pos ? ' · ' + esc(b.posyandu) : ''} · Ibu ${esc(b.ibu || '–')}</div></span>
       ${u ? `<span class="lbl ${u.label}">${u.label}</span><span class="centang ${u._lokal ? 'lokal' : 'sudah'}">${ikon(u._lokal ? 'jam' : 'centang', 18)}</span>` : '<span class="centang belum"></span>'}
     </button>`; }).join('')}</div>` : `<div class="kosong">${S.filterUkur === 'belum' && !S.cari ? 'Semua balita sudah diukur. Terima kasih!' : 'Tidak ada balita yang cocok.'}</div>`);
 }
@@ -886,11 +911,13 @@ function viewBalita(id) {
   const usulan = S.d.usulan.filter(x => x.ID_Balita === id && x.Status === 'Diusulkan');
   const aktif = b.status === 'Aktif' || b.status === 'Menunggu';
   const ket = (k, v) => `<tr><td class="redup">${k}</td><td>${v}</td></tr>`;
+  const lompat = [['ringkas', 'Data'], ['pertumbuhan', 'Pertumbuhan'], ['imun', 'Imunisasi'], ['vitamin', 'Vitamin'], ['kpsp', 'KPSP'], ['tl', 'Tindak lanjut']];
   return { judul: b.nama, nav: 'ukur', html: `
-    <div class="kartu">
+    <div class="lompat"><div class="chips">${lompat.map(x => `<button class="chip" data-aksi="lompat" data-ke="${x[0]}">${x[1]}</button>`).join('')}</div></div>
+    <div class="kartu" id="b-ringkas">
       <div class="baris"><span class="avatar ${b.jk}" style="width:52px;height:52px;font-size:1.1rem">${esc(inisial(b.nama))}</span>
         <div style="flex:1"><div style="font-weight:700;font-size:1.1rem">${esc(b.nama)}</div>
-        <div class="redup kecil">${b.jk === 'L' ? 'Laki-laki' : 'Perempuan'} · ${usiaTeks(usiaBulan(b.tglLahir, hariIni()))} · ${esc(b.posyandu)}</div></div>
+        <div class="redup kecil meta"><span>${b.jk === 'L' ? 'Laki-laki' : 'Perempuan'}</span> · <span>${usiaTeks(usiaBulan(b.tglLahir, hariIni()))}</span> · <span>${esc(b.posyandu)}</span></div></div>
         <span class="lbl ${b.status === 'Aktif' ? 'Hijau' : b.status === 'Menunggu' ? 'Kuning' : 'Abu'}">${esc(b.status)}</span></div>
       ${b.status === 'Menunggu' ? '<div class="pesan-info" style="margin-top:12px">Menunggu persetujuan admin. Pengukuran tetap bisa dicatat.</div>' : ''}
       ${usulan.length ? `<div class="pesan-awas" style="margin-top:12px">Diusulkan keluar (${esc(usulan[0].Alasan)}), menunggu persetujuan admin.</div>` : ''}
@@ -898,15 +925,15 @@ function viewBalita(id) {
         ${ket('Tanggal lahir', fmtTgl(b.tglLahir))}${ket('NIK', esc(b.nik || '–'))}${ket('No KK', esc(b.kk || '–'))}
         ${ket('Ayah / Ibu', esc((b.ayah || '–') + ' / ' + (b.ibu || '–')))}${ket('RT / RW', rtRw(b).slice(6))}
         ${b.hp ? ket('HP orang tua', `<a href="tel:${esc(b.hp)}">${esc(b.hp)}</a>`) : ''}
-        ${ket('Lahir', (+b.bbLahir ? ribuan(b.bbLahir) + ' g' : '–') + ' · ' + (b.pbLahir ? angka(b.pbLahir) + ' cm' : '–') + (b.prematur === 'Y' ? ' · prematur' : ''))}
+        ${ket('Lahir', [+b.bbLahir ? ribuan(b.bbLahir) + ' g' : '', +b.pbLahir ? angka(b.pbLahir) + ' cm' : '', b.prematur === 'Y' ? 'prematur' : ''].filter(Boolean).join(' · ') || '–')}
         ${b.tglKeluar ? ket('Keluar', fmtTgl(b.tglKeluar)) : ''}
       </table></div>
       <div class="deret-tombol" style="margin-top:12px">
         ${aktif ? `<button class="tombol" data-aksi="formUkurP" data-id="${esc(id)}" data-p="${P}">${ikon('ukur', 20)} Ukur</button>` : ''}
         <button class="tombol garis" data-aksi="ke" data-ke="ubah-balita/${esc(id)}">Ubah data</button>
-        ${aktif && !usulan.length ? `<button class="tombol garis" data-aksi="mutasi" data-id="${esc(id)}">Keluarkan</button>` : ''}
         ${!aktif && admin() ? `<button class="tombol garis" data-aksi="aktifkan" data-id="${esc(id)}">Aktifkan lagi</button>` : ''}
       </div>
+      ${aktif && !usulan.length ? `<button class="tautan-bahaya" data-aksi="mutasi" data-id="${esc(id)}">Keluarkan dari daftar (pindah/meninggal)</button>` : ''}
     </div>
     ${t ? `<div class="kartu"><div class="baris antara"><h2 style="margin:0">Terakhir: ${namaPeriode(t.periode)}</h2><span class="lbl ${t.label}">${t.label}</span></div>
       <div class="grid2" style="margin-top:10px">
@@ -916,6 +943,7 @@ function viewBalita(id) {
         <div class="angka"><b>${angka(t.lk)}</b><span>LK (cm) · ${esc(t.stLKU || '–')}</span></div></div>
       ${t.stBBTB ? `<p class="kecil" style="margin:10px 0 0">BB/TB: <b>${esc(t.stBBTB)}</b></p>` : ''}
       ${t.alasan ? `<p class="kecil" style="margin:6px 0 0">${esc(t.alasan)}</p>` : ''}</div>` : ''}
+    <span id="b-pertumbuhan"></span>
     ${rows.length ? `<div class="kartu"><h2>Grafik pertumbuhan</h2>
       <div class="chips">${[['bbu', 'BB/U'], ['tbu', 'TB/U'], ['lku', 'LK/U']].map(g => `<button class="chip ${S.grafik === g[0] ? 'aktif' : ''}" data-aksi="grafik" data-g="${g[0]}">${g[1]}</button>`).join('')}</div>
       <div class="grafik">${grafikKMS(b, S.grafik)}</div>
@@ -926,17 +954,17 @@ function viewBalita(id) {
         <td class="angka-sel">${angka(r.bb)}</td><td class="angka-sel">${angka(r.tb)}</td><td class="angka-sel">${angka(r.lila)}</td><td class="angka-sel">${angka(r.lk)}</td>
         <td>${esc(r.nt || '')}</td><td><span class="lbl ${r.label}">${r.label}</span></td></tr>`).join('')}</table></div>
       <p class="redup kecil" style="margin:8px 0 0">Ketuk baris untuk melihat atau memperbaiki.</p>` : '<div class="redup">Belum ada pengukuran.</div>'}</div>
-    <div class="kartu" id="imun"><div class="baris antara"><h2 style="margin:0">Imunisasi</h2><span class="lbl ${si.idl ? 'Hijau' : 'Abu'}">${si.idl ? 'Dasar lengkap' : 'Dasar belum lengkap'}</span></div>
+    <div class="kartu" id="b-imun"><div class="baris antara"><h2 style="margin:0">Imunisasi</h2><span class="lbl ${si.idl ? 'Hijau' : 'Abu'}">${si.idl ? 'Dasar lengkap' : 'Dasar belum lengkap'}</span></div>
       ${si.list.filter(v => S.semuaVaksin || v.status !== 'Belum waktunya' || v === si.list.find(z => z.status === 'Belum waktunya')).map(v => `<div class="vaksin"><div class="nm">${esc(v.nama)}<small>${v.tgl ? 'Diberi ' + fmtTgl(v.tgl) : 'Usia ' + usiaJadwal(v.kode)}</small></div>
         <span class="lbl ${{ Selesai: 'Hijau', 'Jatuh tempo': 'Kuning', Terlambat: 'Merah', 'Belum waktunya': 'Abu' }[v.status]}">${v.status}</span>
         <button class="tombol garis kecil" data-aksi="formImun" data-id="${esc(id)}" data-k="${esc(v.kode)}">${v.tgl ? 'Ubah' : 'Catat'}</button></div>`).join('')}
       ${si.list.filter(v => v.status === 'Belum waktunya').length > 1 ? `<button class="tombol garis kecil penuh" style="margin-top:10px" data-aksi="semuaVaksin">${S.semuaVaksin ? 'Sembunyikan jadwal berikutnya' : 'Tampilkan semua jadwal (' + si.list.filter(v => v.status === 'Belum waktunya').length + ' belum waktunya)'}</button>` : ''}</div>
-    <div class="kartu"><div class="baris antara"><h2 style="margin:0">Vitamin A &amp; obat cacing</h2><button class="tombol garis kecil" data-aksi="formVit" data-id="${esc(id)}">Catat</button></div>
+    <div class="kartu" id="b-vitamin"><div class="baris antara"><h2 style="margin:0">Vitamin A &amp; obat cacing</h2><button class="tombol garis kecil" data-aksi="formVit" data-id="${esc(id)}">Catat</button></div>
       ${vit.length ? vit.map(v => `<div class="vaksin"><div class="nm">${{ VitA_Biru: 'Vitamin A biru', VitA_Merah: 'Vitamin A merah', Obat_Cacing: 'Obat cacing' }[v.jenis]}${v._lokal ? ' ⏳' : ''}<small>${fmtTgl(v.tgl)} · periode ${namaPeriode(v.periode)}</small></div>
         <button class="tombol bahaya kecil" data-aksi="hapusVit" data-id="${esc(id)}" data-v="${esc(v.id)}">Hapus</button></div>`).join('') : '<div class="redup" style="margin-top:8px">Belum ada catatan.</div>'}
       ${si.usia >= 6 && si.usia <= 59 && !vitASudah(b, periodeVitA(P)) ? `<div class="pesan-awas" style="margin:10px 0 0">Belum menerima vitamin A periode ${namaPeriode(periodeVitA(P))}.</div>` : ''}</div>
-    ${kartuKPSP(b)}${kartuPD3I(b)}
-    <div class="kartu"><div class="baris antara"><h2 style="margin:0">Tindak lanjut</h2><button class="tombol garis kecil" data-aksi="formTL" data-id="${esc(id)}">Catat</button></div>
+    <span id="b-kpsp"></span>${kartuKPSP(b)}${kartuPD3I(b)}
+    <div class="kartu" id="b-tl"><div class="baris antara"><h2 style="margin:0">Tindak lanjut</h2><button class="tombol garis kecil" data-aksi="formTL" data-id="${esc(id)}">Catat</button></div>
       ${tl.length ? tl.slice().reverse().map(x => `<div class="vaksin"><div class="nm"><b>${esc(x.Status)}</b> · ${esc(x.Label)} · ${namaPeriode(String(x.Periode))}
         <small>${esc(x.Alasan)}</small>${x.Dirujuk_Ke ? `<small>Dirujuk ke ${esc(x.Dirujuk_Ke)} ${x.Tgl_Rujuk ? fmtTgl(x.Tgl_Rujuk) : ''}</small>` : ''}
         ${x.Intervensi ? `<small>Intervensi: ${esc(x.Intervensi)}</small>` : ''}${x.Hasil_Periksa ? `<small>Hasil: ${esc(x.Hasil_Periksa)}</small>` : ''}</div></div>`).join('') : '<div class="redup" style="margin-top:8px">Tidak ada.</div>'}</div>` };
@@ -1304,7 +1332,7 @@ function viewProfilLansia(id) {
     <div class="kartu">
       <div class="baris"><span class="avatar ${l.jk}" style="width:52px;height:52px;font-size:1.1rem">${esc(inisial(l.nama))}</span>
         <div style="flex:1"><div style="font-weight:700;font-size:1.1rem">${esc(l.nama)}</div>
-        <div class="redup kecil">${l.jk === 'L' ? 'Laki-laki' : 'Perempuan'} · ${usiaTh(l.tglLahir)} th · ${esc(l.posyandu)}</div></div>
+        <div class="redup kecil meta"><span>${l.jk === 'L' ? 'Laki-laki' : 'Perempuan'}</span> · <span>${usiaTh(l.tglLahir)} th</span> · <span>${esc(l.posyandu)}</span></div></div>
         <span class="lbl ${l.status === 'Aktif' ? 'Hijau' : l.status === 'Menunggu' ? 'Kuning' : 'Abu'}">${esc(l.status)}</span></div>
       ${l.usulKeluar ? `<div class="pesan-awas" style="margin-top:12px">Diusulkan keluar (${esc(l.usulKeluar)}), menunggu persetujuan admin.</div>` : ''}
       <div class="tabel-wrap"><table style="margin-top:8px">
@@ -1317,8 +1345,8 @@ function viewProfilLansia(id) {
       <div class="deret-tombol" style="margin-top:12px">
         ${aktif ? `<button class="tombol" data-aksi="formPeriksaLP" data-id="${esc(id)}" data-p="${periodeKini()}">${ikon('ukur', 20)} Periksa</button>` : ''}
         <button class="tombol garis" data-aksi="ke" data-ke="ubah-lansia/${esc(id)}">Ubah data</button>
-        ${aktif && !l.usulKeluar ? `<button class="tombol garis" data-aksi="keluarL" data-id="${esc(id)}">Keluarkan</button>` : ''}
       </div>
+      ${aktif && !l.usulKeluar ? `<button class="tautan-bahaya" data-aksi="keluarL" data-id="${esc(id)}">Keluarkan dari daftar (pindah/meninggal)</button>` : ''}
     </div>
     ${t ? `<div class="kartu"><div class="baris antara"><h2 style="margin:0">Terakhir: ${namaPeriode(t.periode)}</h2><span class="lbl ${t.label}">${t.label}</span></div>
       <div class="grid2" style="margin-top:10px">
@@ -1543,31 +1571,40 @@ function viewRisiko() {
 /* ---------- Menu ---------- */
 function viewMenu() {
   const { m, g } = hitungAntrean(), u = S.d.user;
-  const item = (ke, judul, sub, aksi) => `<button class="item" data-aksi="${aksi || 'ke'}" data-ke="${ke}"><span class="isi"><div class="nama">${judul}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</span>${ikon('kanan', 18)}</button>`;
+  const item = (ke, judul, sub, aksi, ik, warna) => `<button class="item" data-aksi="${aksi || 'ke'}" data-ke="${ke}">${ik ? `<span class="ik-item ${warna || ''}">${ikon(ik, 20)}</span>` : ''}<span class="isi"><div class="nama">${judul}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</span>${ikon('kanan', 18)}</button>`;
   return { judul: 'Menu', html: `
-    <div class="kartu"><b>${esc(u.nama)}</b><div class="redup kecil">${esc(u.username)} · ${u.peran === 'admin' ? 'Admin desa' : 'Kader ' + esc(u.posyandu)}</div></div>
+    <div class="kartu profil-akun"><span class="avatar" style="width:48px;height:48px;background:var(--gradasi);color:#fff">${esc(inisial(u.nama))}</span>
+      <div style="min-width:0"><b>${esc(u.nama)}</b><div class="redup kecil">${esc(u.username)} · ${u.peran === 'admin' ? 'Admin desa' : 'Kader ' + esc(u.posyandu)}</div></div></div>
+    <div class="judul-sub">Data & kiriman</div>
     <div class="daftar">
-      ${item('antrean', 'Antrean kiriman', m + g ? `${m} menunggu, ${g} gagal` : 'Semua sudah terkirim')}
-      ${item('', 'Sinkron sekarang', 'Ambil data terbaru dari server', 'sinkron')}
-      ${item('data-balita', 'Data balita', 'Daftar, cari, tambah, ubah')}
-      ${item('tambah-balita', 'Tambah balita', 'Bayi lahir, pindah datang, baru terdata')}
-      ${item('lansia', 'Lansia', 'Pemeriksaan bulanan lansia 60+')}
-      ${item('tambah-lansia', 'Tambah lansia', 'Lansia baru terdata atau usia 70+')}
-      ${item('materi-lansia', 'Penyuluhan lansia bugar', 'Bahan CERDIK & PATUH')}
-      ${item('akun', 'Ganti PIN', '')}
-      ${item('', 'Periksa pembaruan', 'Versi ' + esc(C.VERSI) + ' · ketuk untuk memuat versi terbaru', 'cekPembaruan')}
+      ${item('antrean', 'Antrean kiriman', m + g ? `${m} menunggu, ${g} gagal` : 'Semua sudah terkirim', '', 'awan', 'ungu')}
+      ${item('', 'Sinkron sekarang', 'Ambil data terbaru dari server', 'sinkron', 'segar', 'tosca')}
     </div>
-    ${admin() ? `<div class="judul-bagian">Admin</div><div class="daftar">
-      ${item('pantau', 'Pantau penimbangan', 'Progres tiap posyandu bulan ini')}
-      ${item('dashboard', 'Dashboard desa', 'Rekap dan tren 12 bulan')}
-      ${item('persetujuan', 'Persetujuan', 'Balita baru dan usulan keluar')}
-      ${item('laporan', 'Laporan Excel', 'Buat dan unduh laporan bulanan')}
-      ${item('pengguna', 'Akun kader', 'Tambah, ubah PIN, nonaktifkan')}
-      ${item('kunci', 'Kunci periode', 'Kunci bulan yang sudah dilaporkan')}
+    <div class="judul-sub">Balita</div>
+    <div class="daftar">
+      ${item('data-balita', 'Data balita', 'Daftar, cari, tambah, ubah', '', 'daftar')}
+      ${item('tambah-balita', 'Tambah balita', 'Bayi lahir, pindah datang, baru terdata', '', 'bayi')}
+    </div>
+    <div class="judul-sub">Lansia</div>
+    <div class="daftar">
+      ${item('lansia', 'Pemeriksaan lansia', 'Daftar & pemeriksaan bulanan lansia 60+', '', 'nadi', 'hijau')}
+      ${item('tambah-lansia', 'Tambah lansia', 'Lansia baru terdata atau usia 70+', '', 'lansia', 'hijau')}
+      ${item('materi-lansia', 'Penyuluhan lansia bugar', 'Bahan CERDIK & PATUH', '', 'buku', 'oranye')}
+    </div>
+    ${admin() ? `<div class="judul-sub">Admin desa</div><div class="daftar">
+      ${item('pantau', 'Pantau penimbangan', 'Progres tiap posyandu bulan ini', '', 'papan', 'tosca')}
+      ${item('dashboard', 'Dashboard desa', 'Rekap dan tren 12 bulan', '', 'batang')}
+      ${item('persetujuan', 'Persetujuan', 'Balita/lansia baru dan usulan keluar', '', 'setuju', 'oranye')}
+      ${item('laporan', 'Laporan Excel & ePPGBM', 'Buat dan unduh laporan bulanan', '', 'dokumen', 'hijau')}
+      ${item('pengguna', 'Akun kader', 'Tambah, ubah PIN, nonaktifkan', '', 'akun', 'ungu')}
+      ${item('kunci', 'Kunci periode', 'Kunci bulan yang sudah dilaporkan', '', 'gembok', 'abu')}
     </div>` : ''}
-    <div class="daftar" style="margin-top:12px">
-      ${S.pasang ? item('', 'Pasang aplikasi di layar HP', '', 'pasang') : ''}
-      ${item('', 'Keluar', 'Hapus data dari HP ini', 'keluar')}
+    <div class="judul-sub">Akun & aplikasi</div>
+    <div class="daftar">
+      ${item('akun', 'Ganti PIN', '', '', 'gembok', 'abu')}
+      ${item('', 'Periksa pembaruan', 'Versi ' + esc(C.VERSI) + ' · muat versi terbaru', 'cekPembaruan', 'segar')}
+      ${S.pasang ? item('', 'Pasang aplikasi di layar HP', '', 'pasang', 'awan') : ''}
+      ${item('', 'Keluar', 'Hapus data dari HP ini', 'keluar', 'kembali', 'merah')}
     </div>
     <p class="redup kecil" style="text-align:center">${esc(C.NAMA)} versi ${esc(C.VERSI)} · ${esc(S.d.desa)}</p>` };
 }
@@ -1688,24 +1725,34 @@ function viewDashboard() {
     const ps = []; for (let i = 0; i < 24; i++) ps.push(geserPeriode(periodeKini(), -i));
     el.innerHTML = `
       <label class="isian"><span>Periode</span><select data-ubah="periodeDash">${ps.map(p => `<option value="${p}" ${p === S.periodeDash ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>
-      <div class="grid3">
+      <div class="judul-sub">Penimbangan balita</div>
+      <div class="statistik">
         <div class="angka"><b>${t.S}</b><span>Sasaran (S)</span></div>
         <div class="angka"><b>${t.D}</b><span>Ditimbang · ${angka(t.D_S_Persen)}%</span></div>
         <div class="angka oke"><b>${angka(t.N_D_Persen)}%</b><span>Naik (N/D)</span></div>
+      </div>
+      <div class="judul-sub">Status gizi balita</div>
+      <div class="statistik">
         <div class="angka merah"><b>${t.Stunting}</b><span>Stunting · ${angka(t.Stunting_Persen)}%</span></div>
         <div class="angka merah"><b>${t.Wasting}</b><span>Wasting</span></div>
         <div class="angka kuning"><b>${t.Underweight}</b><span>Underweight</span></div>
         <div class="angka merah"><b>${t.Merah}</b><span>Label merah</span></div>
+      </div>
+      ${d.lansia ? `<div class="judul-sub">Lansia</div>
+      <div class="statistik">
+        <button class="angka" data-aksi="ke" data-ke="pantau"><b>${d.lansia.D}/${d.lansia.S}</b><span>Diperiksa bulan ini</span></button>
+        <div class="angka ${d.lansia.HT ? 'kuning' : ''}"><b>${d.lansia.HT}</b><span>Hipertensi</span></div>
+        <div class="angka ${d.lansia.Merah ? 'merah' : ''}"><b>${d.lansia.Merah}</b><span>Label merah</span></div>
+        <div class="angka ${d.lansia.GulaTinggi ? 'kuning' : ''}"><b>${d.lansia.GulaTinggi || 0}</b><span>Gula darah tinggi</span></div>
+        <div class="angka"><b>${d.lansia.Skrining || 0}/${d.lansia.S}</b><span>Sudah skrining (12 bulan)</span></div>
+        <div class="angka ${d.lansia.PerluRujuk ? 'kuning' : ''}"><b>${d.lansia.PerluRujuk || 0}</b><span>Temuan skrining</span></div>
+      </div>` : ''}
+      <div class="judul-sub">Tindak lanjut & layanan</div>
+      <div class="statistik">
         <div class="angka ${d.tlTerlambat ? 'merah' : ''}"><b>${d.tlTerlambat}</b><span>Merah belum ditangani &gt; 14 hari</span></div>
         <button class="angka ${d.menunggu ? 'kuning' : ''}" data-aksi="ke" data-ke="persetujuan"><b>${d.menunggu}</b><span>Menunggu persetujuan</span></button>
-        ${d.lansia ? `<button class="angka" data-aksi="ke" data-ke="pantau"><b>${d.lansia.D}/${d.lansia.S}</b><span>Lansia diperiksa</span></button>
-        <div class="angka ${d.lansia.HT ? 'kuning' : ''}"><b>${d.lansia.HT}</b><span>Lansia hipertensi</span></div>
-        <div class="angka ${d.lansia.Merah ? 'merah' : ''}"><b>${d.lansia.Merah}</b><span>Lansia label merah</span></div>
-        <div class="angka ${d.lansia.GulaTinggi ? 'kuning' : ''}"><b>${d.lansia.GulaTinggi || 0}</b><span>Lansia gula darah tinggi</span></div>
-        <div class="angka"><b>${d.lansia.Skrining || 0}/${d.lansia.S}</b><span>Lansia skrining 12 bulan</span></div>
-        <div class="angka ${d.lansia.PerluRujuk ? 'kuning' : ''}"><b>${d.lansia.PerluRujuk || 0}</b><span>Temuan skrining lansia</span></div>` : ''}
         <button class="angka ${d.pd3iAktif ? 'merah' : ''}" data-aksi="ke" data-ke="risiko"><b>${d.pd3iAktif || 0}</b><span>Suspek PD3I aktif</span></button>
-        <button class="angka ${d.kpspPerluRujuk ? 'kuning' : ''}" data-aksi="ke" data-ke="risiko"><b>${d.kpspPerluRujuk || 0}</b><span>KPSP meragukan/penyimpangan</span></button>
+        <button class="angka ${d.kpspPerluRujuk ? 'kuning' : ''}" data-aksi="ke" data-ke="risiko"><b>${d.kpspPerluRujuk || 0}</b><span>KPSP meragukan / penyimpangan</span></button>
       </div>
       <div class="kartu" style="margin-top:12px"><h2>Tren 12 bulan</h2>${grafikTren(d.tren)}</div>
       <div class="kartu"><h2>Per posyandu</h2><div class="tabel-wrap"><table>
@@ -1924,6 +1971,8 @@ const AKSI = {
   grafik: el => { S.grafik = el.dataset.g; render(); },
   semuaVaksin: () => { S.semuaVaksin = !S.semuaVaksin; render(); },
   keVitA: () => { S.tabImun = 'Vitamin A'; location.hash = '#/imunisasi'; },
+  lompat: el => { const t = document.getElementById('b-' + el.dataset.ke); if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' }); },
+  keSkrining: () => { S.filterL = 'skrining'; location.hash = '#/lansia'; },
   formUkur: el => formUkur(el.dataset.id, S.periode || periodeKini()),
   formUkurP: el => formUkur(el.dataset.id, el.dataset.p),
   formImun: el => formImun(el.dataset.id, el.dataset.k),
