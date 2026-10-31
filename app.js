@@ -251,7 +251,7 @@ function terapkanLokal(d, it) {
       if (x.kk) data.kk = x.kk;
       if (b) Object.assign(b, data);
       else {
-        const baru = Object.assign({ id: x.id, posyandu: x.posyandu || (S.sesi && S.sesi.user.posyandu), status: S.sesi && S.sesi.user.peran === 'admin' ? 'Aktif' : 'Menunggu',
+        const baru = Object.assign({ id: x.id, posyandu: x.posyandu || (S.sesi && S.sesi.user.posyandu), status: 'Aktif',
           nik: x.nik || '', nikHash: '', kk: x.kk || '', tglMasuk: hariIni(), tglKeluar: '' }, data);
         d.balita.push(baru); d.byId[baru.id] = baru;
       }
@@ -428,11 +428,11 @@ function bisaUbahPeriode(p) {
   return { ok: true };
 }
 function posTerpilih(b) { return !admin() || !S.pos || b.posyandu === S.pos; }
-/* Sasaran periode p: aktif/menunggu, sudah lahir, belum 60 bulan */
-function sasaran(p) {
+/* Sasaran periode p: aktif/menunggu, sudah lahir, belum 60 bulan. pos = posyandu tertentu (pantauan admin) */
+function sasaran(p, pos) {
   const akhir = akhirPeriode(p);
   return S.d.balita.filter(b => (b.status === 'Aktif' || b.status === 'Menunggu') && b.tglLahir && b.tglLahir <= akhir &&
-    usiaBulan(b.tglLahir, awalPeriode(p)) < 60 && posTerpilih(b));
+    usiaBulan(b.tglLahir, awalPeriode(p)) < 60 && (pos === undefined ? posTerpilih(b) : b.posyandu === pos));
 }
 const ukurDi = (id, p) => (S.d.ukur[id] || {})[p] || null;
 function ukurTerakhir(id) {
@@ -596,6 +596,7 @@ function viewBeranda() {
     ['ke', 'menu', 'w-hijau', 'menu', 'Lainnya']
   ];
   const layananAdmin = [
+    ['ke', 'pantau', 'w-tosca', 'papan', 'Pantau timbang'],
     ['ke', 'dashboard', 'w-biru', 'batang', 'Dashboard'],
     ['ke', 'persetujuan', 'w-kuning', 'setuju', 'Persetujuan', menunggu],
     ['ke', 'laporan', 'w-hijau', 'dokumen', 'Laporan Excel'],
@@ -983,6 +984,7 @@ function viewMenu() {
       ${item('', 'Periksa pembaruan', 'Versi ' + esc(C.VERSI) + ' · ketuk untuk memuat versi terbaru', 'cekPembaruan')}
     </div>
     ${admin() ? `<div class="judul-bagian">Admin</div><div class="daftar">
+      ${item('pantau', 'Pantau penimbangan', 'Progres tiap posyandu bulan ini')}
       ${item('dashboard', 'Dashboard desa', 'Rekap dan tren 12 bulan')}
       ${item('persetujuan', 'Persetujuan', 'Balita baru dan usulan keluar')}
       ${item('laporan', 'Laporan Excel', 'Buat dan unduh laporan bulanan')}
@@ -1060,7 +1062,6 @@ function viewFormBalita(id) {
       <label class="isian"><span>Catatan</span><input name="catatan" maxlength="200" value="${v('catatan')}"></label>
       <div id="galatB"></div>
       <button class="tombol penuh" type="submit">Simpan</button>
-      ${!b && !admin() ? '<p class="redup kecil">Balita baru berstatus Menunggu sampai disetujui admin, tetapi sudah bisa diukur.</p>' : ''}
     </form>` };
 }
 
@@ -1133,9 +1134,58 @@ function viewDashboard() {
         <tr style="font-weight:700"><td>Desa</td><td class="angka-sel">${t.S}</td><td class="angka-sel">${t.D}</td><td class="angka-sel">${angka(t.D_S_Persen)}%</td><td class="angka-sel">${t.Stunting}</td><td class="angka-sel">${t.Merah}</td><td class="angka-sel">${t.IDL}/${t.Sasaran_IDL}</td></tr>
       </table></div></div>
       <p class="redup kecil">Mutasi ${namaPeriode(S.periodeDash)}: ${d.mutasi.masuk} masuk, ${d.mutasi.keluar} keluar. Tindak lanjut terbuka: ${d.tlBuka}.</p>
+      <button class="tombol garis penuh" data-aksi="ke" data-ke="pantau" style="margin-bottom:10px">Pantau penimbangan per posyandu</button>
       <button class="tombol penuh" data-aksi="ke" data-ke="laporan">Buat laporan Excel</button>`;
   };
   return v;
+}
+
+/* ---------- Pantau penimbangan (admin) ---------- */
+const waktuTeks = s => { s = String(s || ''); return s ? fmtTgl(s.slice(0, 10)) + (s.length > 10 ? ' ' + s.slice(11, 16) : '') : ''; };
+function viewPantau() {
+  const v = perluSinyal('Pantau penimbangan');
+  v.setelah = async () => {
+    if (!S.periodePantau) S.periodePantau = periodeKini();
+    const r = await api('pantau', { periode: S.periodePantau }, { batas: 90000 });
+    const el = $('#isiOnline'); if (!el) return;
+    if (!r.ok) return tampilGagal(r);
+    const d = r.data, ps = [];
+    for (let i = 0; i < 12; i++) ps.push(geserPeriode(periodeKini(), -i));
+    const mulai = d.posyandu.filter(x => x.D > 0).length;
+    const urut = d.posyandu.slice().sort((a, b) => (!a.S - !b.S) || a.persen - b.persen || S.d.posyandu.indexOf(a.posyandu) - S.d.posyandu.indexOf(b.posyandu));
+    el.innerHTML = `
+      <label class="isian"><span>Periode</span><select data-ubah="periodePantau">${ps.map(p => `<option value="${p}" ${p === S.periodePantau ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>
+      <div class="kartu"><div class="baris antara"><b>${esc(S.d.desa)}</b><span class="persen">${angka(d.total.persen)}%</span></div>
+        <div class="besar">${d.total.D} <small>/ ${d.total.S} balita ditimbang</small></div>
+        <div class="progres"><i style="width:${Math.min(100, d.total.persen)}%"></i></div>
+        <div class="redup kecil">${mulai} dari ${d.posyandu.length} posyandu sudah menginput ${esc(namaPeriode(d.periode))}.</div></div>
+      <div class="judul-bagian">Per posyandu (cakupan terendah di atas)</div>
+      ${urut.map(x => `<div class="kartu">
+        <div class="baris antara"><b>${esc(x.posyandu)}</b><span class="lbl ${!x.S ? 'Abu' : x.D === 0 ? 'Merah' : x.persen < 60 ? 'Kuning' : 'Hijau'}">${!x.S ? 'Tanpa sasaran' : x.D === 0 ? 'Belum input' : angka(x.persen) + '%'}</span></div>
+        <div class="progres"><i style="width:${Math.min(100, x.persen)}%"></i></div>
+        <div class="kecil">${x.D} dari ${x.S} sudah ditimbang · <b>${x.S - x.D}</b> belum${x.merah ? ` · <span style="color:var(--merah)">${x.merah} label merah</span>` : ''}</div>
+        <div class="redup kecil">${x.terakhir ? 'Input terakhir ' + esc(waktuTeks(x.terakhir)) + (x.petugas ? ' oleh ' + esc(x.petugas) : '') : 'Belum ada input pada periode ini'}</div>
+        <div class="redup kecil">${x.kader.length ? 'Kader: ' + esc(x.kader.join(', ')) : '<span style="color:var(--merah)">Belum ada akun kader aktif</span>'}</div>
+        ${x.S - x.D > 0 ? `<button class="tombol garis kecil penuh" style="margin-top:10px" data-aksi="ke" data-ke="belum/${esc(encodeURIComponent(x.posyandu))}">Lihat ${x.S - x.D} balita belum ditimbang</button>` : ''}
+      </div>`).join('')}
+      <p class="redup kecil">Angka dihitung server dari data yang sudah terkirim. Isian kader yang masih di antrean HP (belum ada sinyal) belum terhitung.</p>`;
+  };
+  return v;
+}
+
+/* Balita belum ditimbang di satu posyandu: dari data di HP admin (bisa offline) */
+function viewBelum(pos) {
+  const p = S.periodePantau || periodeKini();
+  const list = sasaran(p, pos).filter(b => !ukurDi(b.id, p)).sort(urutNama);
+  S.daftarBelum = { pos, p, list };
+  return { judul: 'Belum ditimbang', nav: 'menu', html: `
+    <div class="pesan-info">${esc(pos)} · ${esc(namaPeriode(p))}: <b>${list.length}</b> balita belum ditimbang. Data dari sinkron terakhir HP ini; tekan Sinkron bila perlu.</div>
+    <div class="deret-tombol" style="margin-bottom:10px"><button class="tombol garis kecil" data-aksi="sinkron">Sinkron</button>${list.length ? '<button class="tombol garis kecil" data-aksi="salinBelum">Salin untuk WhatsApp</button>' : ''}</div>
+    ${list.length ? `<div class="daftar">${list.map(b => { const t = ukurTerakhir(b.id); return `<button class="item" data-aksi="ke" data-ke="balita/${esc(b.id)}">
+      <span class="avatar ${b.jk}">${esc(inisial(b.nama))}</span>
+      <span class="isi"><div class="nama">${esc(b.nama)}</div><div class="sub">${usiaTeks(usiaBulan(b.tglLahir, hariIni()))} · Ibu ${esc(b.ibu || '–')} · ${rtRw(b)}</div>
+      <div class="sub">${t ? 'Terakhir ditimbang ' + esc(namaPeriode(t.periode)) : 'Belum pernah ditimbang'}</div></span>${ikon('kanan', 18)}</button>`; }).join('')}</div>`
+      : '<div class="kosong">Semua balita di posyandu ini sudah ditimbang.</div>'}` };
 }
 
 function grafikTren(tren) {
@@ -1252,7 +1302,7 @@ function viewAkun() {
 
 const VIEWS = {
   beranda: viewBeranda, ukur: viewUkur, imunisasi: viewImunisasi, risiko: viewRisiko, menu: viewMenu, balita: viewBalita, antrean: viewAntrean,
-  'data-balita': viewDataBalita, 'tambah-balita': () => viewFormBalita(''), 'ubah-balita': viewFormBalita, dashboard: viewDashboard,
+  'data-balita': viewDataBalita, 'tambah-balita': () => viewFormBalita(''), 'ubah-balita': viewFormBalita, dashboard: viewDashboard, pantau: viewPantau, belum: viewBelum,
   persetujuan: viewPersetujuan, laporan: viewLaporan, pengguna: viewPengguna, kunci: viewKunci, akun: viewAkun
 };
 
@@ -1260,6 +1310,13 @@ const VIEWS = {
    AKSI (event delegation)
    ===================================================================== */
 const AKSI = {
+  salinBelum: async () => {
+    const x = S.daftarBelum; if (!x) return;
+    const teks = `*Balita belum ditimbang ${namaPeriode(x.p)}* — Posyandu ${x.pos}\n` +
+      x.list.map((b, i) => `${i + 1}. ${b.nama} (${rtRw(b)}, ibu ${b.ibu || '-'})`).join('\n');
+    try { await navigator.clipboard.writeText(teks); toast('Daftar disalin. Tempel di WhatsApp.'); }
+    catch (e) { bukaLembar(`<h3>Salin teks</h3><textarea style="min-height:240px">${esc(teks)}</textarea>`); }
+  },
   ke: el => {
     // Dari dalam lembar: ganti entri riwayat lembar, agar Kembali tidak membuka halaman yang sama dua kali
     const dariLembar = lapisan.length && history.state && history.state.lapis;
