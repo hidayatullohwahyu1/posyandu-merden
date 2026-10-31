@@ -237,10 +237,63 @@ var PENYAKIT_PD3I = [
 ];
 var STATUS_PD3I = ['Dilaporkan', 'Diperiksa nakes', 'Bukan kasus', 'Kasus', 'Selesai'];
 
+/* ---------- Lansia (pedoman P2PTM Kemenkes) ----------
+   IMT dewasa Indonesia: kurus < 18,5; normal 18,5–25,0; gemuk > 25,0–27,0; obesitas > 27,0.
+   Obesitas sentral: lingkar perut > 90 cm (laki-laki), > 80 cm (perempuan).
+   Tekanan darah: normal < 120/80; pra-hipertensi 120–139/80–89; derajat 1 140–159/90–99;
+   derajat 2 >= 160/100; >= 180/110 sangat tinggi (rujuk segera). */
+function statusIMT(imt) {
+  if (imt === null || imt === undefined) return '';
+  return imt < 18.5 ? 'Kurus' : imt <= 25 ? 'Normal' : imt <= 27 ? 'Gemuk' : 'Obesitas';
+}
+function statusTD(sistol, diastol) {
+  var s = +sistol, d = +diastol;
+  if (!(s > 0) || !(d > 0)) return '';
+  if (s >= 180 || d >= 110) return 'Sangat tinggi';
+  if (s >= 160 || d >= 100) return 'Hipertensi derajat 2';
+  if (s >= 140 || d >= 90) return 'Hipertensi derajat 1';
+  if (s >= 120 || d >= 80) return 'Pra-hipertensi';
+  return 'Normal';
+}
+/* p = {jk, bb, tb, lp, sistol, diastol, merokok:'Y'|'T'|'', obat:'Y'|'T'|'', riwayatHT, riwayatDM} */
+function hitungLansia(p) {
+  var bb = +p.bb || 0, tb = +p.tb || 0, lp = +p.lp || 0, s = +p.sistol || 0, d = +p.diastol || 0;
+  var imt = bb > 0 && tb > 0 ? Math.round(bb / Math.pow(tb / 100, 2) * 10) / 10 : null;
+  var stIMT = statusIMT(imt), stTD = statusTD(s, d);
+  var stLP = lp > 0 ? (lp > (p.jk === 'L' ? 90 : 80) ? 'Obesitas sentral' : 'Normal') : '';
+  var merah = [], kuning = [], td = s + '/' + d;
+  if (stTD === 'Sangat tinggi') merah.push('Tekanan darah sangat tinggi ' + td + ' — rujuk segera');
+  else if (stTD === 'Hipertensi derajat 2') merah.push('Hipertensi derajat 2 (' + td + ')');
+  else if (stTD === 'Hipertensi derajat 1') kuning.push('Hipertensi derajat 1 (' + td + ')');
+  if (stIMT === 'Kurus') kuning.push('IMT kurus (' + String(imt).replace('.', ',') + ')');
+  if (stIMT === 'Obesitas') kuning.push('IMT obesitas (' + String(imt).replace('.', ',') + ')');
+  if (stLP === 'Obesitas sentral') kuning.push('Lingkar perut berlebih (' + String(lp).replace('.', ',') + ' cm)');
+  if (p.merokok === 'Y') kuning.push('Merokok');
+  var riw = [];
+  if (p.riwayatHT === 'Y') riw.push('hipertensi');
+  if (p.riwayatDM === 'Y') riw.push('diabetes');
+  if (riw.length && p.obat === 'T') kuning.push('Riwayat ' + riw.join(' dan ') + ' tetapi tidak minum obat rutin');
+  return { imt: imt, stIMT: stIMT, stLP: stLP, stTD: stTD,
+    label: merah.length ? 'Merah' : kuning.length ? 'Kuning' : 'Hijau', alasan: merah.concat(kuning) };
+}
+function validasiLansia(d) {
+  if (!d.tgl || isNaN(tglKeMs(d.tgl))) return 'Tanggal pemeriksaan wajib diisi.';
+  if (periodeDari(d.tgl) !== d.periode) return 'Tanggal pemeriksaan harus di dalam periode ' + namaPeriode(d.periode) + '.';
+  if (!(+d.bb > 0) && !(+d.tb > 0) && !(+d.lp > 0) && !(+d.sistol > 0) && !(+d.diastol > 0)) return 'Isi minimal satu hasil pemeriksaan.';
+  if (+d.bb && (+d.bb < 20 || +d.bb > 200)) return 'Berat badan harus 20 sampai 200 kg.';
+  if (+d.tb && (+d.tb < 100 || +d.tb > 200)) return 'Tinggi badan harus 100 sampai 200 cm.';
+  if (+d.lp && (+d.lp < 40 || +d.lp > 200)) return 'Lingkar perut harus 40 sampai 200 cm.';
+  if ((+d.sistol > 0) !== (+d.diastol > 0)) return 'Isi tekanan darah lengkap: sistol dan diastol.';
+  if (+d.sistol && (+d.sistol < 60 || +d.sistol > 260)) return 'Sistol harus 60 sampai 260 mmHg.';
+  if (+d.diastol && (+d.diastol < 30 || +d.diastol > 160)) return 'Diastol harus 30 sampai 160 mmHg.';
+  if (+d.sistol && +d.sistol <= +d.diastol) return 'Sistol (angka atas) harus lebih besar dari diastol (angka bawah).';
+  return '';
+}
+
 /* Agar bisa dipakai di Node (uji) tanpa mengganggu Apps Script/browser */
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { hitungGizi: hitungGizi, hitungNT: hitungNT, hitungLabel: hitungLabel, skorRisiko: skorRisiko,
     validasiUkur: validasiUkur, peringatanUkur: peringatanUkur, statusImunisasi: statusImunisasi,
     periodeVitA: periodeVitA, geserPeriode: geserPeriode, akhirPeriode: akhirPeriode, usiaBulan: usiaBulan,
-    usiaKPSP: usiaKPSP, hasilKPSP: hasilKPSP };
+    usiaKPSP: usiaKPSP, hasilKPSP: hasilKPSP, hitungLansia: hitungLansia, validasiLansia: validasiLansia };
 }

@@ -182,12 +182,16 @@ function olahData(raw) {
   raw.vit.forEach(r => { (vit[r[0]] = vit[r[0]] || []).push({ periode: r[1], jenis: r[2], tgl: r[3], id: r[4] }); });
   const lay = raw.layanan || { kpsp: [], pd3i: [] }, kpsp = {};
   lay.kpsp.forEach(r => { (kpsp[r[0]] = kpsp[r[0]] || {})[r[1]] = kpspObj(r); });
+  const ls = raw.lansia || { kolLansia: [], lansia: [], kolPeriksa: KOL_PERIKSA_L, periksa: [] }, periksaL = {};
+  ls.periksa.forEach(r => { const o = ob(ls.kolPeriksa, r); (periksaL[o.id] = periksaL[o.id] || {})[o.periode] = o; });
   return {
     waktu: raw.waktu, waktuSinkron: Date.now(), user: raw.user, posyandu: raw.posyandu, desa: raw.desa,
     kolUkur: raw.kolUkur, balita: raw.balita.map(r => ob(raw.kolBalita, r)), ukur, imun, vit,
-    tl: raw.tl, usulan: raw.usulan, jadwal: raw.jadwal, kbm: raw.kbm, kunci: raw.kunci, kpsp, pd3i: lay.pd3i.map(pd3iObj)
+    tl: raw.tl, usulan: raw.usulan, jadwal: raw.jadwal, kbm: raw.kbm, kunci: raw.kunci, kpsp, pd3i: lay.pd3i.map(pd3iObj),
+    lansia: ls.lansia.map(r => ob(ls.kolLansia, r)), kolPeriksaL: ls.kolPeriksa, periksaL
   };
 }
+const KOL_PERIKSA_L = ['id', 'periode', 'tgl', 'bb', 'tb', 'imt', 'stIMT', 'lp', 'stLP', 'sistol', 'diastol', 'stTD', 'obat', 'merokok', 'label', 'alasan', 'diubahPada', 'petugas'];
 const kpspObj = r => ({ usia: +r[1], tgl: r[2], ya: +r[3], hasil: r[4], tdd: r[5], tdl: r[6], catatan: r[7], id: r[8] });
 const pd3iObj = r => ({ idLapor: r[0], id: r[1], penyakit: r[2], tglGejala: r[3], gejala: r[4], imun: r[5], status: r[6], tl: r[7], pelapor: r[8], tglLapor: r[9] });
 function barisKeUkur(arr) { const o = {}; S.dasar.kolUkur.forEach((k, i) => { o[k] = arr[i]; }); return o; }
@@ -198,6 +202,8 @@ function susunData() {
   const d = typeof structuredClone === 'function' ? structuredClone(S.dasar) : JSON.parse(JSON.stringify(S.dasar));
   d.byId = {};
   d.kpsp = d.kpsp || {}; d.pd3i = d.pd3i || [];   // data tersimpan dari versi lama
+  d.lansia = d.lansia || []; d.periksaL = d.periksaL || {}; d.lansiaById = {};
+  d.lansia.forEach(l => { d.lansiaById[l.id] = l; });
   d.balita.forEach(b => { d.byId[b.id] = b; });
   S.antrean.filter(it => it.status !== 'gagal').forEach(it => terapkanLokal(d, it));
   S.d = d;
@@ -268,6 +274,34 @@ function terapkanLokal(d, it) {
         b.tglKeluar = x.jenis === 'Masuk' ? '' : x.tanggal;
       } else d.usulan.push({ ID_Balita: b.id, Jenis: x.jenis, Alasan: x.alasan, Tanggal: x.tanggal, Status: 'Diusulkan', _lokal: true });
       break;
+    case 'simpanPeriksaLansia': {
+      const l = d.lansiaById[x.id]; if (!l) return;
+      const h = hitungLansia({ jk: l.jk, bb: x.bb, tb: x.tb, lp: x.lp, sistol: x.sistol, diastol: x.diastol, merokok: x.merokok, obat: x.obat, riwayatHT: l.rHT, riwayatDM: l.rDM });
+      (d.periksaL[l.id] = d.periksaL[l.id] || {})[x.periode] = { id: l.id, periode: x.periode, tgl: x.tgl, bb: x.bb || '', tb: x.tb || '', imt: h.imt === null ? '' : h.imt,
+        stIMT: h.stIMT, lp: x.lp || '', stLP: h.stLP, sistol: x.sistol || '', diastol: x.diastol || '', stTD: h.stTD, obat: x.obat, merokok: x.merokok,
+        label: h.label, alasan: h.alasan.join('; '), diubahPada: '', petugas: S.sesi ? S.sesi.user.username : '', _lokal: true };
+      break; }
+    case 'hapusPeriksaLansia':
+      if (d.periksaL[x.id]) delete d.periksaL[x.id][x.periode];
+      break;
+    case 'simpanLansia': {
+      const l = d.lansiaById[x.id];
+      const data = { nama: x.nama, jk: x.jk, tglLahir: x.tglLahir, rt: x.rt, rw: x.rw, dusun: x.dusun, hp: x.hp, rHT: x.rHT, rDM: x.rDM, catatan: x.catatan, _lokal: true };
+      if (x.posyandu) data.posyandu = x.posyandu;
+      if (x.nik) data.nik = x.nik;
+      if (x.kk) data.kk = x.kk;
+      if (l) Object.assign(l, data);
+      else {
+        const baru = Object.assign({ id: x.id, posyandu: x.posyandu || (S.sesi && S.sesi.user.posyandu), status: 'Aktif', nik: '', kk: '', tglMasuk: hariIni(), tglKeluar: '',
+          usulKeluar: '', usulTanggal: '' }, data);
+        d.lansia.push(baru); d.lansiaById[baru.id] = baru;
+      }
+      break; }
+    case 'usulKeluarLansia': {
+      const l = d.lansiaById[x.id]; if (!l) return;
+      if (S.sesi && S.sesi.user.peran === 'admin') { l.status = x.alasan === 'Meninggal' ? 'Meninggal' : x.alasan === 'Pindah' ? 'Pindah' : 'Keluar'; l.tglKeluar = x.tanggal; }
+      else { l.usulKeluar = x.alasan; l.usulTanggal = x.tanggal; }
+      break; }
     case 'simpanKPSP':
       if (!b) return;
       (d.kpsp[x.id] = d.kpsp[x.id] || {})[x.usiaKpsp] = { usia: x.usiaKpsp, tgl: x.tgl, ya: x.jumlahYa, hasil: hasilKPSP(x.jumlahYa),
@@ -293,6 +327,9 @@ function terimaHasil(it, h) {
   const D = S.dasar, x = it.data;
   if (!D.kpsp) D.kpsp = {};
   if (!D.pd3i) D.pd3i = [];
+  if (!D.lansia) D.lansia = [];
+  if (!D.periksaL) D.periksaL = {};
+  if (!D.kolPeriksaL) D.kolPeriksaL = KOL_PERIKSA_L;
   const masihAda = S.antrean.some(o => o !== it && o.kunci && o.kunci === it.kunci && o.status !== 'gagal');
   switch (it.action) {
     case 'simpanPengukuran':
@@ -323,6 +360,23 @@ function terimaHasil(it, h) {
       else D.usulan.push({ ID: h.idMutasi, ID_Balita: x.id, Jenis: x.jenis, Alasan: x.alasan, Tanggal: x.tanggal, Status: 'Diusulkan' });
       break;
     case 'simpanTindakLanjut': tlMasuk(D, h); break;
+    case 'simpanPeriksaLansia':
+      if (!masihAda) { const r = {}; D.kolPeriksaL.forEach((k, i) => { r[k] = h.periksa[i]; }); (D.periksaL[r.id] = D.periksaL[r.id] || {})[r.periode] = r; }
+      break;
+    case 'hapusPeriksaLansia': if (!masihAda && D.periksaL[x.id]) delete D.periksaL[x.id][x.periode]; break;
+    case 'simpanLansia': {
+      let l = D.lansia.find(z => z.id === h.id);
+      if (!l) { l = { id: h.id, tglMasuk: hariIni(), tglKeluar: '', usulKeluar: '', usulTanggal: '' }; D.lansia.push(l); }
+      Object.assign(l, { nama: x.nama, jk: x.jk, tglLahir: x.tglLahir, rt: x.rt, rw: x.rw, dusun: x.dusun, hp: x.hp, rHT: x.rHT, rDM: x.rDM, catatan: x.catatan,
+        status: h.status, posyandu: x.posyandu || l.posyandu || S.sesi.user.posyandu });
+      if (x.nik) l.nik = S.sesi.user.peran === 'admin' ? x.nik : x.nik.slice(0, 4) + 'xxxxxxxx' + x.nik.slice(-4);
+      if (x.kk) l.kk = S.sesi.user.peran === 'admin' ? x.kk : x.kk.slice(0, 4) + 'xxxxxxxx' + x.kk.slice(-4);
+      break; }
+    case 'usulKeluarLansia': {
+      const l = D.lansia.find(z => z.id === x.id);
+      if (l && h.status === 'Disetujui') { l.status = x.alasan === 'Meninggal' ? 'Meninggal' : x.alasan === 'Pindah' ? 'Pindah' : 'Keluar'; l.tglKeluar = x.tanggal; }
+      else if (l) { l.usulKeluar = x.alasan; l.usulTanggal = x.tanggal; }
+      break; }
     case 'simpanKPSP': if (!masihAda) (D.kpsp[h[0]] = D.kpsp[h[0]] || {})[h[1]] = kpspObj(h); break;
     case 'laporPD3I': if (!masihAda) D.pd3i = D.pd3i.filter(z => z.idLapor !== h[0]).concat([pd3iObj(h)]); break;
   }
@@ -355,6 +409,8 @@ function kunciAntrean(a, x) {
   if (a === 'simpanImunisasi' || a === 'hapusImunisasi') return 'imun|' + x.id + '|' + x.kode;
   if (a === 'simpanVitamin') return 'vit|' + x.id + '|' + x.jenis + '|' + x.tgl.slice(0, 7);
   if (a === 'simpanBalita') return 'balita|' + x.id;
+  if (a === 'simpanPeriksaLansia' || a === 'hapusPeriksaLansia') return 'pl|' + x.id + '|' + x.periode;
+  if (a === 'simpanLansia') return 'lansia|' + x.id;
   if (a === 'simpanKPSP') return 'kpsp|' + x.id + '|' + x.usiaKpsp;
   if (a === 'laporPD3I') return 'pd3i|' + x.idLapor;
   return '';
@@ -543,6 +599,7 @@ function segarkan() {
     perbaruiStatus();
     if ($('#daftarUkur')) isiDaftarUkur();
     if ($('#daftarB')) isiDataBalita();
+    if ($('#daftarL')) isiDaftarLansia();
     return;
   }
   render();
@@ -612,6 +669,7 @@ function viewBeranda() {
     ['ke', 'imunisasi', 'w-biru', 'suntik', 'Imunisasi'],
     ['keVitA', '', 'w-oranye', 'kapsul', 'Vitamin A'],
     ['ke', 'risiko', 'w-merah', 'awas', 'Risiko'],
+    ['ke', 'lansia', 'w-hijau', 'orang', 'Lansia'],
     ['ke', 'data-balita', 'w-tosca', 'orang', 'Data balita'],
     ['ke', 'tambah-balita', 'w-pink', 'bayi', 'Tambah balita'],
     ['ke', 'antrean', 'w-ungu', 'awan', 'Antrean', m + g],
@@ -649,6 +707,11 @@ function viewBeranda() {
     ${S.pasang ? `<div class="banner biru"><span class="bulat w-tosca" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;color:#fff">${ikon('awan', 20)}</span><div class="isi"><b>Pasang di layar HP</b><div class="kecil">Agar cukup mengetuk ikon.</div></div><button class="tombol kecil" data-aksi="pasang">Pasang</button></div>` : ''}
     ${pd3iAktif().length ? `<div class="pesan-galat"><b>${pd3iAktif().length} suspek PD3I aktif.</b> <a href="#/risiko">Lihat</a> — pastikan sudah diteruskan ke Puskesmas.</div>` : ''}
     ${g ? `<div class="pesan-galat">${g} kiriman ditolak server. <a href="#/antrean">Periksa</a></div>` : m ? `<div class="pesan-awas">${m} data belum terkirim. Akan terkirim otomatis saat ada sinyal.</div>` : ''}
+    ${(() => { const sl = sasaranLansia(), sd = sl.filter(l => periksaDi(l.id, P)).length, pl = sl.length ? Math.round(sd / sl.length * 100) : 0;
+      return sl.length ? `<button class="kartu" data-aksi="ke" data-ke="lansia" style="display:block;width:100%;text-align:left;border:0;cursor:pointer">
+        <div class="baris antara"><span class="label-kecil">Pemeriksaan lansia ${esc(namaPeriode(P))}</span><span class="persen">${pl}%</span></div>
+        <div class="besar">${sd} <small>/ ${sl.length} lansia</small></div><div class="progres"><i style="width:${pl}%"></i></div>
+        <div class="redup kecil">${sl.length - sd ? (sl.length - sd) + ' lansia belum diperiksa bulan ini' : 'Semua lansia sudah diperiksa.'}</div></button>` : ''; })()}
     <div class="judul-bagian">Perlu perhatian</div>
     <div class="grid2">
       <button class="ubin merah" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('awas', 22)}</span><span><b>${ris.Merah.length}</b><span>Perlu rujukan</span></span></button>
@@ -1074,6 +1137,237 @@ function formPD3I(id, idLapor) {
   });
 }
 
+/* =====================================================================
+   LANSIA — daftar, pemeriksaan bulanan, profil, tambah/ubah, keluar
+   ===================================================================== */
+const usiaTh = tgl => Math.floor(usiaBulan(tgl, hariIni()) / 12);
+const periksaDi = (id, p) => (S.d.periksaL[id] || {})[p] || null;
+function periksaTerakhir(id) {
+  const u = S.d.periksaL[id] || {}, ps = Object.keys(u).sort();
+  return ps.length ? u[ps[ps.length - 1]] : null;
+}
+function sasaranLansia(pos) {
+  return S.d.lansia.filter(l => (l.status === 'Aktif' || l.status === 'Menunggu') && (pos === undefined ? posTerpilih(l) : l.posyandu === pos));
+}
+const tdTeks = x => x && +x.sistol ? x.sistol + '/' + x.diastol : '–';
+
+function viewLansia() {
+  if (!S.periodeL) S.periodeL = periodeKini();
+  const ps = opsiPeriode();
+  if (ps.indexOf(S.periodeL) < 0) S.periodeL = ps[0];
+  const boleh = bisaUbahPeriode(S.periodeL);
+  return { judul: 'Lansia ' + namaPeriode(S.periodeL), nav: 'menu', html: `
+    ${admin() ? `<div class="grid2"><label class="isian"><span>Periode</span><select data-ubah="periodeL">${ps.map(p => `<option value="${p}" ${p === S.periodeL ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>${pilihPosyandu()}</div>`
+      : `<div class="chips">${ps.map(p => `<button class="chip ${p === S.periodeL ? 'aktif' : ''}" data-aksi="periodeL" data-p="${p}">${namaPeriode(p)}</button>`).join('')}</div>`}
+    ${boleh.ok ? '' : `<div class="pesan-awas">${esc(boleh.pesan)} Data hanya bisa dilihat.</div>`}
+    <div class="cari">${ikon('cari', 20)}<input id="cariL" type="search" placeholder="Cari nama atau RT" value="${esc(S.cariL || '')}" autocomplete="off"></div>
+    <div class="chips">${[['belum', 'Belum diperiksa'], ['sudah', 'Sudah diperiksa'], ['semua', 'Semua']].map(f => `<button class="chip ${(S.filterL || 'belum') === f[0] ? 'aktif' : ''}" data-aksi="filterL" data-f="${f[0]}">${f[1]}</button>`).join('')}</div>
+    <button class="tombol garis penuh" data-aksi="ke" data-ke="tambah-lansia" style="margin-bottom:10px">${ikon('tambah', 20)} Tambah lansia</button>
+    <div id="daftarL"></div>`,
+    setelah: () => { isiDaftarLansia(); const c = $('#cariL'); c.addEventListener('input', () => { S.cariL = c.value; isiDaftarLansia(); }); } };
+}
+function isiDaftarLansia() {
+  const el = $('#daftarL'); if (!el) return;
+  const p = S.periodeL, f = S.filterL || 'belum', q = rapiSpasi(S.cariL || '').toLowerCase();
+  let list = sasaranLansia().sort(urutNama);
+  const total = list.length, sudah = list.filter(l => periksaDi(l.id, p)).length;
+  if (f === 'belum') list = list.filter(l => !periksaDi(l.id, p));
+  if (f === 'sudah') list = list.filter(l => periksaDi(l.id, p));
+  if (q) list = list.filter(l => l.nama.toLowerCase().indexOf(q) >= 0 || ('rt ' + l.rt).indexOf(q) >= 0 || rtRw(l).toLowerCase().indexOf(q) >= 0);
+  el.innerHTML = `<p class="redup kecil" style="margin:0 4px 8px">${sudah} dari ${total} sudah diperiksa · ${list.length} ditampilkan</p>` + (list.length ? `<div class="daftar">${list.slice(0, 300).map(l => {
+    const u = periksaDi(l.id, p);
+    return `<button class="item" data-aksi="formPeriksaL" data-id="${esc(l.id)}">
+      <span class="avatar ${l.jk}">${esc(inisial(l.nama))}</span>
+      <span class="isi"><div class="nama">${esc(l.nama)}${l._lokal ? ' ⏳' : ''}</div><div class="sub">${usiaTh(l.tglLahir)} th · ${rtRw(l)}${admin() && !S.pos ? ' · ' + esc(l.posyandu) : ''}${u ? ' · TD ' + tdTeks(u) : ''}</div></span>
+      ${u ? `<span class="lbl ${u.label}">${u.label}</span><span class="centang ${u._lokal ? 'lokal' : 'sudah'}">${ikon(u._lokal ? 'jam' : 'centang', 18)}</span>` : '<span class="centang belum"></span>'}
+    </button>`; }).join('')}</div>` : `<div class="kosong">${f === 'belum' && !q ? 'Semua lansia sudah diperiksa. Terima kasih!' : 'Tidak ada lansia yang cocok.'}</div>`);
+}
+
+function formPeriksaL(id, periode) {
+  const l = S.d.lansiaById[id]; if (!l) return;
+  periode = periode || S.periodeL || periodeKini();
+  const u = periksaDi(id, periode), boleh = bisaUbahPeriode(periode), dis = boleh.ok ? '' : 'disabled';
+  const lalu = (() => { const t = periksaTerakhir(id); return t && t.periode < periode ? t : null; })();
+  const tglDef = u ? u.tgl : (periode === periodeKini() ? hariIni() : akhirPeriode(periode));
+  const maxTgl = akhirPeriode(periode) > hariIni() ? hariIni() : akhirPeriode(periode);
+  const nilai = k => u ? esc(angka(u[k]).replace('–', '')) : '';
+  const hint = (k, sat) => lalu && lalu[k] !== '' && lalu[k] !== undefined ? `<div class="lalu">${namaPeriode(lalu.periode).split(' ')[0]}: ${angka(lalu[k])} ${sat}</div>` : '';
+  const yt = (nama, v) => `<select name="${nama}" ${dis}><option value="">–</option><option value="Y" ${v === 'Y' ? 'selected' : ''}>Ya</option><option value="T" ${v === 'T' ? 'selected' : ''}>Tidak</option></select>`;
+  const riw = [l.rHT === 'Y' ? 'hipertensi' : '', l.rDM === 'Y' ? 'diabetes' : ''].filter(Boolean).join(' & ');
+  bukaLembar(`
+    <h3>${esc(l.nama)}</h3>
+    <div class="redup kecil" style="margin-bottom:12px">${l.jk === 'L' ? 'Laki-laki' : 'Perempuan'} · ${usiaTh(l.tglLahir)} th · ${rtRw(l)} · ${namaPeriode(periode)}${riw ? ' · riwayat ' + riw : ''}</div>
+    ${boleh.ok ? '' : `<div class="pesan-awas">${esc(boleh.pesan)}</div>`}
+    ${u ? `<div class="pesan-info">Data ${namaPeriode(periode)} sudah ada${u._lokal ? ' (belum terkirim)' : ''}. Ubah angka lalu tekan Perbarui.</div>` : ''}
+    <form id="fPeriksaL" data-id="${esc(id)}" data-periode="${periode}">
+      <label class="isian"><span>Tanggal periksa</span><input type="date" name="tgl" value="${tglDef}" min="${awalPeriode(periode)}" max="${maxTgl}" required ${dis}></label>
+      <div class="grid2">
+        <label class="isian"><span>Berat badan</span><div class="isian-angka"><input name="bb" inputmode="decimal" value="${nilai('bb')}" placeholder="0,0" ${dis}><em>kg</em></div>${hint('bb', 'kg')}</label>
+        <label class="isian"><span>Tinggi badan</span><div class="isian-angka"><input name="tb" inputmode="decimal" value="${u ? nilai('tb') : (lalu && lalu.tb ? esc(angka(lalu.tb)) : '')}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('tb', 'cm')}</label>
+      </div>
+      <label class="isian"><span>Lingkar perut</span><div class="isian-angka"><input name="lp" inputmode="decimal" value="${nilai('lp')}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lp', 'cm')}</label>
+      <div class="grid2">
+        <label class="isian"><span>Sistol (angka atas)</span><div class="isian-angka"><input name="sistol" inputmode="numeric" value="${nilai('sistol')}" placeholder="120" ${dis}><em>mmHg</em></div>${lalu && +lalu.sistol ? `<div class="lalu">${namaPeriode(lalu.periode).split(' ')[0]}: ${tdTeks(lalu)}</div>` : ''}</label>
+        <label class="isian"><span>Diastol (angka bawah)</span><div class="isian-angka"><input name="diastol" inputmode="numeric" value="${nilai('diastol')}" placeholder="80" ${dis}><em>mmHg</em></div></label>
+      </div>
+      <div class="grid2">
+        <label class="isian"><span>Minum obat rutin</span>${yt('obat', u ? u.obat : (lalu ? lalu.obat : ''))}</label>
+        <label class="isian"><span>Merokok</span>${yt('merokok', u ? u.merokok : (lalu ? lalu.merokok : ''))}</label>
+      </div>
+      <div id="galatPL"></div>
+      ${boleh.ok ? `<button class="tombol penuh" type="submit">${u ? 'Perbarui' : 'Simpan'}</button>
+      <div class="deret-tombol" style="margin-top:10px">
+        ${u ? '<button type="button" class="tombol bahaya" data-aksi="hapusPeriksaL">Hapus</button>' : ''}
+        <button type="button" class="tombol garis" data-aksi="tutup">Batal</button>
+        <button type="button" class="tombol garis" data-aksi="ke" data-ke="lansia-profil/${esc(id)}">Profil</button></div>`
+      : `<div class="deret-tombol"><button type="button" class="tombol garis" data-aksi="tutup">Tutup</button><button type="button" class="tombol garis" data-aksi="ke" data-ke="lansia-profil/${esc(id)}">Profil</button></div>`}
+    </form>`, el => { const i = el.querySelector('input[name=bb]'); if (i && !i.value && boleh.ok) setTimeout(() => i.focus(), 250); });
+}
+
+async function simpanPeriksaL(f) {
+  const id = f.dataset.id, periode = f.dataset.periode, l = S.d.lansiaById[id];
+  const x = { id, periode, tgl: f.tgl.value, obat: f.obat.value, merokok: f.merokok.value };
+  const nama = { bb: 'Berat badan', tb: 'Tinggi badan', lp: 'Lingkar perut', sistol: 'Sistol', diastol: 'Diastol' };
+  for (const k of Object.keys(nama)) {
+    const n = bacaAngka(f[k].value);
+    if (Number.isNaN(n)) { $('#galatPL').innerHTML = `<div class="pesan-galat">${nama[k]} harus berupa angka.</div>`; return; }
+    x[k] = n === '' ? 0 : n;
+  }
+  const err = validasiLansia(x) || (x.tgl < l.tglLahir ? 'Tanggal periksa sebelum tanggal lahir.' : '');
+  if (err) { $('#galatPL').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
+  const lalu = periksaTerakhir(id), w = [];
+  if (lalu && lalu.periode < periode && +lalu.bb && x.bb && Math.abs(x.bb - lalu.bb) > 5) w.push('Berat badan berubah lebih dari 5 kg dari pemeriksaan terakhir (' + angka(lalu.bb) + ' kg).');
+  if (lalu && lalu.periode < periode && +lalu.tb && x.tb && Math.abs(x.tb - lalu.tb) > 3) w.push('Tinggi badan berbeda lebih dari 3 cm dari pemeriksaan terakhir (' + angka(lalu.tb) + ' cm).');
+  if (w.length && !await konfirmasi('Periksa kembali angkanya', w.map(esc).join('<br>') + '<br><br>Apakah angka sudah benar?', 'Ya, tetap simpan')) return;
+  await antrekan('simpanPeriksaLansia', x, 'Periksa lansia ' + l.nama + ' (' + namaPeriode(periode) + ')');
+  tampilHasilL(l, periksaDi(id, periode));
+}
+
+function tampilHasilL(l, u) {
+  const p = u.periode;
+  const berikut = sasaranLansia().filter(z => !periksaDi(z.id, p) && z.id !== l.id).sort(urutNama).find(z => urutNama(z, l) > 0) || sasaranLansia().find(z => !periksaDi(z.id, p));
+  const baris = (n, v, st) => v !== '' && v !== '–' ? `<tr><td>${n}</td><td class="angka-sel">${v}</td><td>${esc(st || '')}</td></tr>` : '';
+  bukaLembar(`
+    <h3>${esc(l.nama)}</h3><div class="redup kecil" style="margin-bottom:12px">Tersimpan ${S.online ? '' : '(akan dikirim saat ada sinyal)'} · ${namaPeriode(p)}</div>
+    <div class="hasil ${u.label}"><div class="baris antara"><b>${u.label === 'Merah' ? 'Perlu rujukan' : u.label === 'Kuning' ? 'Waspada' : 'Normal'}</b><span class="lbl ${u.label}">${u.label}</span></div>
+      ${u.alasan ? `<ul>${u.alasan.split('; ').map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '<div class="kecil">Hasil pemeriksaan dalam batas normal.</div>'}</div>
+    <table><tr><th>Pemeriksaan</th><th class="angka-sel">Hasil</th><th>Status</th></tr>
+      ${baris('Tekanan darah', +u.sistol ? tdTeks(u) + ' mmHg' : '', u.stTD)}${baris('IMT', u.imt !== '' && u.imt !== null ? angka(u.imt) : '', u.stIMT)}
+      ${baris('Lingkar perut', +u.lp ? angka(u.lp) + ' cm' : '', u.stLP)}${baris('Berat badan', +u.bb ? angka(u.bb) + ' kg' : '', '')}</table>
+    <p class="redup kecil">Hasil ini penanda dini, bukan diagnosis. Pemeriksaan dan pengobatan oleh tenaga kesehatan.${u.label === 'Merah' ? ' Sarankan segera ke Puskesmas.' : ''}</p>
+    <div class="deret-tombol">
+      ${berikut ? `<button class="tombol" data-aksi="formPeriksaL" data-id="${esc(berikut.id)}">Berikutnya: ${esc(berikut.nama.split(' ').slice(0, 2).join(' '))} ${ikon('kanan', 18)}</button>` : ''}
+      <button class="tombol garis" data-aksi="tutupRender">Selesai</button></div>`);
+}
+
+function viewProfilLansia(id) {
+  const l = S.d.lansiaById[id];
+  if (!l) return { judul: 'Lansia', nav: 'menu', html: '<div class="kosong">Data lansia tidak ditemukan.</div>' };
+  const rows = Object.values(S.d.periksaL[id] || {}).sort((a, c) => (a.periode < c.periode ? 1 : -1)), t = rows[0];
+  const aktif = l.status === 'Aktif' || l.status === 'Menunggu', ket = (k, v) => `<tr><td class="redup">${k}</td><td>${v}</td></tr>`;
+  const yt = v => v === 'Y' ? 'Ya' : v === 'T' ? 'Tidak' : '–';
+  return { judul: l.nama, nav: 'menu', html: `
+    <div class="kartu">
+      <div class="baris"><span class="avatar ${l.jk}" style="width:52px;height:52px;font-size:1.1rem">${esc(inisial(l.nama))}</span>
+        <div style="flex:1"><div style="font-weight:700;font-size:1.1rem">${esc(l.nama)}</div>
+        <div class="redup kecil">${l.jk === 'L' ? 'Laki-laki' : 'Perempuan'} · ${usiaTh(l.tglLahir)} th · ${esc(l.posyandu)}</div></div>
+        <span class="lbl ${l.status === 'Aktif' ? 'Hijau' : l.status === 'Menunggu' ? 'Kuning' : 'Abu'}">${esc(l.status)}</span></div>
+      ${l.usulKeluar ? `<div class="pesan-awas" style="margin-top:12px">Diusulkan keluar (${esc(l.usulKeluar)}), menunggu persetujuan admin.</div>` : ''}
+      <div class="tabel-wrap"><table style="margin-top:8px">
+        ${ket('Tanggal lahir', fmtTgl(l.tglLahir))}${ket('NIK', esc(l.nik || '–'))}${ket('No KK', esc(l.kk || '–'))}
+        ${ket('RT / RW', rtRw(l).slice(6))}${ket('Dusun', esc(l.dusun || '–'))}
+        ${l.hp ? ket('No HP', `<a href="tel:${esc(l.hp)}">${esc(l.hp)}</a>`) : ''}
+        ${ket('Riwayat hipertensi', yt(l.rHT))}${ket('Riwayat diabetes', yt(l.rDM))}
+        ${l.catatan ? ket('Catatan', esc(l.catatan)) : ''}${l.tglKeluar ? ket('Keluar', fmtTgl(l.tglKeluar)) : ''}
+      </table></div>
+      <div class="deret-tombol" style="margin-top:12px">
+        ${aktif ? `<button class="tombol" data-aksi="formPeriksaLP" data-id="${esc(id)}" data-p="${periodeKini()}">${ikon('ukur', 20)} Periksa</button>` : ''}
+        <button class="tombol garis" data-aksi="ke" data-ke="ubah-lansia/${esc(id)}">Ubah data</button>
+        ${aktif && !l.usulKeluar ? `<button class="tombol garis" data-aksi="keluarL" data-id="${esc(id)}">Keluarkan</button>` : ''}
+      </div>
+    </div>
+    ${t ? `<div class="kartu"><div class="baris antara"><h2 style="margin:0">Terakhir: ${namaPeriode(t.periode)}</h2><span class="lbl ${t.label}">${t.label}</span></div>
+      <div class="grid2" style="margin-top:10px">
+        <div class="angka"><b>${tdTeks(t)}</b><span>Tekanan darah · ${esc(t.stTD || '–')}</span></div>
+        <div class="angka"><b>${angka(t.imt)}</b><span>IMT · ${esc(t.stIMT || '–')}</span></div>
+        <div class="angka"><b>${angka(t.lp)}</b><span>Lingkar perut (cm) · ${esc(t.stLP || '–')}</span></div>
+        <div class="angka"><b>${angka(t.bb)}</b><span>Berat badan (kg)</span></div></div>
+      ${t.alasan ? `<p class="kecil" style="margin:10px 0 0">${esc(t.alasan)}</p>` : ''}</div>` : ''}
+    <div class="kartu"><h2>Riwayat pemeriksaan</h2>${rows.length ? `<div class="tabel-wrap"><table>
+      <tr><th>Bulan</th><th class="angka-sel">TD</th><th class="angka-sel">BB</th><th class="angka-sel">IMT</th><th class="angka-sel">LP</th><th>Label</th></tr>
+      ${rows.map(r => `<tr class="bisa-ketuk" data-aksi="formPeriksaLP" data-id="${esc(id)}" data-p="${r.periode}"><td>${namaPeriode(r.periode).slice(0, 3)} ${r.periode.slice(2, 4)}${r._lokal ? ' ⏳' : ''}</td>
+        <td class="angka-sel">${tdTeks(r)}</td><td class="angka-sel">${angka(r.bb)}</td><td class="angka-sel">${angka(r.imt)}</td><td class="angka-sel">${angka(r.lp)}</td><td><span class="lbl ${r.label}">${r.label}</span></td></tr>`).join('')}</table></div>
+      <p class="redup kecil" style="margin:8px 0 0">Ketuk baris untuk melihat atau memperbaiki.</p>` : '<div class="redup">Belum ada pemeriksaan.</div>'}</div>
+    <p class="redup kecil">Label adalah penanda dini, bukan diagnosis.</p>` };
+}
+
+function viewFormLansia(id) {
+  const l = id ? S.d.lansiaById[id] : null;
+  const v = k => l ? esc(l[k] === undefined || l[k] === null ? '' : l[k]) : '';
+  const yt = (nama, val) => `<select name="${nama}"><option value="">Tidak tahu</option><option value="T" ${val === 'T' ? 'selected' : ''}>Tidak</option><option value="Y" ${val === 'Y' ? 'selected' : ''}>Ya</option></select>`;
+  const dusun = [...new Set(S.d.lansia.map(x => x.dusun).filter(Boolean))].sort();
+  return { judul: l ? 'Ubah data lansia' : 'Tambah lansia', nav: 'menu', html: `
+    <form id="fLansia" class="kartu" data-id="${l ? esc(l.id) : ''}">
+      <label class="isian"><span>Nama lengkap * (sesuai KTP/KK)</span><input name="nama" value="${v('nama')}" required autocapitalize="characters" maxlength="60"></label>
+      <div class="grid2">
+        <label class="isian"><span>Jenis kelamin *</span><select name="jk" required><option value="">Pilih…</option><option value="L" ${l && l.jk === 'L' ? 'selected' : ''}>Laki-laki</option><option value="P" ${l && l.jk === 'P' ? 'selected' : ''}>Perempuan</option></select></label>
+        <label class="isian"><span>Tanggal lahir *</span><input type="date" name="tglLahir" value="${v('tglLahir')}" max="${hariIni()}" required></label>
+      </div>
+      <label class="isian"><span>NIK (16 angka)</span><input name="nik" inputmode="numeric" maxlength="16" placeholder="${l && l.nik ? esc(l.nik) + ' — isi untuk mengganti' : 'Kosongkan jika tidak tahu'}" value="${admin() ? v('nik') : ''}"></label>
+      <label class="isian"><span>No KK (16 angka)</span><input name="kk" inputmode="numeric" maxlength="16" placeholder="${l && l.kk ? esc(l.kk) + ' — isi untuk mengganti' : ''}" value="${admin() ? v('kk') : ''}"></label>
+      <div class="grid3">
+        <label class="isian"><span>RT</span><input name="rt" inputmode="numeric" maxlength="3" placeholder="001" value="${l && l.rt ? String(l.rt).padStart(3, '0') : ''}"></label>
+        <label class="isian"><span>RW</span><input name="rw" inputmode="numeric" maxlength="3" placeholder="002" value="${l && l.rw ? String(l.rw).padStart(3, '0') : ''}"></label>
+        <label class="isian"><span>Dusun</span><input name="dusun" list="daftarDusun" value="${v('dusun')}" autocapitalize="characters"><datalist id="daftarDusun">${dusun.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
+      </div>
+      ${admin() ? `<label class="isian"><span>Posyandu *</span><select name="posyandu" required>${S.d.posyandu.map(p => `<option ${(l ? l.posyandu : S.pos) === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>` : ''}
+      <label class="isian"><span>No HP</span><input name="hp" type="tel" inputmode="tel" maxlength="16" placeholder="Contoh: 081234567890" value="${v('hp')}"></label>
+      <div class="grid2">
+        <label class="isian"><span>Riwayat hipertensi</span>${yt('rHT', l ? l.rHT : '')}</label>
+        <label class="isian"><span>Riwayat diabetes</span>${yt('rDM', l ? l.rDM : '')}</label>
+      </div>
+      <label class="isian"><span>Catatan</span><input name="catatan" maxlength="200" value="${v('catatan')}"></label>
+      <div id="galatLs"></div>
+      <button class="tombol penuh" type="submit">Simpan</button>
+    </form>` };
+}
+
+async function simpanLansiaForm(f) {
+  const nik = f.nik.value.replace(/\D/g, ''), kk = f.kk.value.replace(/\D/g, ''), nama = rapiNama(f.nama.value);
+  const rt = rapiRT(f.rt.value), rw = rapiRT(f.rw.value), hp = rapiHP(f.hp.value), prov = n => +n.slice(0, 2) >= 11 && +n.slice(0, 2) <= 94;
+  const err = nama.length < 2 ? 'Nama wajib diisi.' : !namaSah(nama) ? 'Nama hanya boleh huruf, spasi, titik, koma, apostrof, dan tanda hubung.'
+    : !f.jk.value ? 'Pilih jenis kelamin.' : !f.tglLahir.value ? 'Tanggal lahir wajib diisi.' : usiaTh(f.tglLahir.value) < 60 ? 'Usia belum 60 tahun.'
+    : nik && (nik.length !== 16 || !prov(nik)) ? 'NIK harus 16 angka dengan kode provinsi yang sah.' : kk && (kk.length !== 16 || !prov(kk)) ? 'No KK harus 16 angka dengan kode provinsi yang sah.'
+    : nik && nik === kk ? 'NIK dan No KK tidak boleh sama.' : +rt > 999 || +rw > 999 ? 'RT/RW diisi angka 1 sampai 3 digit, contoh 001.'
+    : hp && !/^08\d{8,11}$/.test(hp) ? 'No HP harus diawali 08 dan berisi 10–13 angka, contoh 081234567890.' : '';
+  if (err) { $('#galatLs').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
+  const id = f.dataset.id || idBaru('LNS-K');
+  const x = { id, nama, jk: f.jk.value, tglLahir: f.tglLahir.value, nik, kk, rt, rw, dusun: rapiNama(f.dusun.value), hp, rHT: f.rHT.value, rDM: f.rDM.value,
+    catatan: rapiSpasi(f.catatan.value), posyandu: f.posyandu ? f.posyandu.value : S.sesi.user.posyandu };
+  if (!f.dataset.id && nama && S.d.lansia.some(z => z.nama === nama && z.tglLahir === x.tglLahir) &&
+      !await konfirmasi('Data mungkin ganda', esc(nama) + ' dengan tanggal lahir yang sama sudah ada. Tetap simpan?', 'Tetap simpan')) return;
+  await antrekan('simpanLansia', x, (f.dataset.id ? 'Ubah lansia ' : 'Tambah lansia ') + nama);
+  toast('Data lansia tersimpan.');
+  location.hash = '#/lansia-profil/' + encodeURIComponent(id);
+}
+
+function formKeluarL(id) {
+  const l = S.d.lansiaById[id];
+  bukaLembar(`<h3>Keluarkan dari daftar lansia</h3><div class="redup kecil" style="margin-bottom:12px">${esc(l.nama)}. ${admin() ? 'Langsung berlaku.' : 'Usulan akan disetujui admin.'} Data tidak dihapus.</div>
+    <form id="fKeluarL" data-id="${esc(id)}">
+      <label class="isian"><span>Alasan</span><select name="alasan" required><option value="">Pilih…</option><option>Meninggal</option><option>Pindah</option><option>Lainnya</option></select></label>
+      <label class="isian"><span>Tanggal</span><input type="date" name="tanggal" value="${hariIni()}" max="${hariIni()}" required></label>
+      <label class="isian"><span>Keterangan</span><input name="keterangan" maxlength="120"></label>
+      <button class="tombol bahaya penuh" type="submit">${admin() ? 'Keluarkan' : 'Kirim usulan'}</button>
+      <button type="button" class="tombol garis penuh" style="margin-top:10px" data-aksi="tutup">Batal</button>
+    </form>`);
+}
+
+function lansiaMerah() {
+  const P = periodeKini(), P1 = geserPeriode(P, -1);
+  return sasaranLansia().map(l => ({ l, u: periksaDi(l.id, P) || periksaDi(l.id, P1) })).filter(x => x.u && x.u.label === 'Merah').sort((a, c) => urutNama(a.l, c.l));
+}
+
 /* ---------- Imunisasi ---------- */
 function viewImunisasi() {
   const P = periodeKini(), perVit = periodeVitA(P), sas = sasaran(P);
@@ -1113,7 +1407,11 @@ function viewRisiko() {
     ${admin() ? pilihPosyandu() : ''}
     <div class="pesan-info">Berdasarkan pengukuran ${namaPeriode(periodeKini())} (atau bulan lalu bila belum diukur). Ketuk nama untuk mencatat rujukan dan intervensi.</div>
     ${pd3iAktif().length ? `<div class="judul-bagian" style="color:var(--merah)">Suspek PD3I aktif (${pd3iAktif().length})</div><div class="daftar">${pd3iAktif().map(itemPD3I).join('')}</div>` : ''}
-    ${bagian('Merah — perlu rujukan', r.Merah)}${bagian('Kuning — waspada', r.Kuning)}${bagian('Tidak ditimbang 2 bulan atau lebih', r.Absen, true)}
+    ${bagian('Merah — perlu rujukan', r.Merah)}${bagian('Kuning — waspada', r.Kuning)}
+    ${(() => { const l = lansiaMerah(); return l.length ? `<div class="judul-bagian">Lansia — perlu rujukan (${l.length})</div><div class="daftar">${l.map(x => `<button class="item" data-aksi="ke" data-ke="lansia-profil/${esc(x.l.id)}">
+      <span class="avatar ${x.l.jk}">${esc(inisial(x.l.nama))}</span><span class="isi"><div class="nama">${esc(x.l.nama)}</div>
+      <div class="sub dua">${esc(x.u.alasan)}</div><div class="sub">${usiaTh(x.l.tglLahir)} th · ${rtRw(x.l)} · ${esc(namaPeriode(x.u.periode))}${admin() && !S.pos ? ' · ' + esc(x.l.posyandu) : ''}</div></span>
+      <span class="lbl Merah">Merah</span></button>`).join('')}</div>` : ''; })()}${bagian('Tidak ditimbang 2 bulan atau lebih', r.Absen, true)}
     ${(() => { const l = kpspPerlu(); return `<div class="judul-bagian">Perkembangan perlu tindak lanjut (${l.length})</div>` + (l.length ? `<div class="daftar">${l.map(x => `<button class="item" data-aksi="ke" data-ke="balita/${esc(x.b.id)}">
       <span class="avatar ${x.b.jk}">${esc(inisial(x.b.nama))}</span><span class="isi"><div class="nama">${esc(x.b.nama)}</div>
       <div class="sub">KPSP ${x.k.usia} bulan · ${fmtTgl(x.k.tgl)} · ${x.k.hasil === 'Meragukan' ? 'periksa ulang 2 minggu' : 'rujuk ke Puskesmas'}</div>
@@ -1133,6 +1431,8 @@ function viewMenu() {
       ${item('', 'Sinkron sekarang', 'Ambil data terbaru dari server', 'sinkron')}
       ${item('data-balita', 'Data balita', 'Daftar, cari, tambah, ubah')}
       ${item('tambah-balita', 'Tambah balita', 'Bayi lahir, pindah datang, baru terdata')}
+      ${item('lansia', 'Lansia', 'Pemeriksaan bulanan lansia 60+')}
+      ${item('tambah-lansia', 'Tambah lansia', 'Lansia baru terdata atau usia 70+')}
       ${item('akun', 'Ganti PIN', '')}
       ${item('', 'Periksa pembaruan', 'Versi ' + esc(C.VERSI) + ' · ketuk untuk memuat versi terbaru', 'cekPembaruan')}
     </div>
@@ -1277,6 +1577,9 @@ function viewDashboard() {
         <div class="angka merah"><b>${t.Merah}</b><span>Label merah</span></div>
         <div class="angka ${d.tlTerlambat ? 'merah' : ''}"><b>${d.tlTerlambat}</b><span>Merah belum ditangani &gt; 14 hari</span></div>
         <button class="angka ${d.menunggu ? 'kuning' : ''}" data-aksi="ke" data-ke="persetujuan"><b>${d.menunggu}</b><span>Menunggu persetujuan</span></button>
+        ${d.lansia ? `<button class="angka" data-aksi="ke" data-ke="pantau"><b>${d.lansia.D}/${d.lansia.S}</b><span>Lansia diperiksa</span></button>
+        <div class="angka ${d.lansia.HT ? 'kuning' : ''}"><b>${d.lansia.HT}</b><span>Lansia hipertensi</span></div>
+        <div class="angka ${d.lansia.Merah ? 'merah' : ''}"><b>${d.lansia.Merah}</b><span>Lansia label merah</span></div>` : ''}
         <button class="angka ${d.pd3iAktif ? 'merah' : ''}" data-aksi="ke" data-ke="risiko"><b>${d.pd3iAktif || 0}</b><span>Suspek PD3I aktif</span></button>
         <button class="angka ${d.kpspPerluRujuk ? 'kuning' : ''}" data-aksi="ke" data-ke="risiko"><b>${d.kpspPerluRujuk || 0}</b><span>KPSP meragukan/penyimpangan</span></button>
       </div>
@@ -1313,13 +1616,15 @@ function viewPantau() {
       <div class="kartu"><div class="baris antara"><b>${esc(S.d.desa)}</b><span class="persen">${angka(d.total.persen)}%</span></div>
         <div class="besar">${d.total.D} <small>/ ${d.total.S} balita ditimbang</small></div>
         <div class="progres"><i style="width:${Math.min(100, d.total.persen)}%"></i></div>
-        <div class="redup kecil">${mulai} dari ${d.posyandu.length} posyandu sudah menginput ${esc(namaPeriode(d.periode))}.</div></div>
+        <div class="redup kecil">${mulai} dari ${d.posyandu.length} posyandu sudah menginput ${esc(namaPeriode(d.periode))}.</div>
+        ${d.total.lansiaS ? `<div class="kecil" style="margin-top:6px">Lansia: <b>${d.total.lansiaD}</b> dari ${d.total.lansiaS} sudah diperiksa</div>` : ''}</div>
       <div class="judul-bagian">Per posyandu (cakupan terendah di atas)</div>
       ${urut.map(x => `<div class="kartu">
         <div class="baris antara"><b>${esc(x.posyandu)}</b><span class="lbl ${!x.S ? 'Abu' : x.D === 0 ? 'Merah' : x.persen < 60 ? 'Kuning' : 'Hijau'}">${!x.S ? 'Tanpa sasaran' : x.D === 0 ? 'Belum input' : angka(x.persen) + '%'}</span></div>
         <div class="progres"><i style="width:${Math.min(100, x.persen)}%"></i></div>
         <div class="kecil">${x.D} dari ${x.S} sudah ditimbang · <b>${x.S - x.D}</b> belum${x.merah ? ` · <span style="color:var(--merah)">${x.merah} label merah</span>` : ''}</div>
         <div class="redup kecil">${x.terakhir ? 'Input terakhir ' + esc(waktuTeks(x.terakhir)) + (x.petugas ? ' oleh ' + esc(x.petugas) : '') : 'Belum ada input pada periode ini'}</div>
+        ${x.lansiaS ? `<div class="kecil">Lansia: ${x.lansiaD} dari ${x.lansiaS} sudah diperiksa</div>` : ''}
         <div class="redup kecil">${x.kader.length ? 'Kader: ' + esc(x.kader.join(', ')) : '<span style="color:var(--merah)">Belum ada akun kader aktif</span>'}</div>
         ${x.S - x.D > 0 ? `<button class="tombol garis kecil penuh" style="margin-top:10px" data-aksi="ke" data-ke="belum/${esc(encodeURIComponent(x.posyandu))}">Lihat ${x.S - x.D} balita belum ditimbang</button>` : ''}
       </div>`).join('')}
@@ -1370,6 +1675,10 @@ function viewPersetujuan() {
         <div class="sub">${b.jk || '?'} · lahir ${fmtTgl(b.tglLahir)} · Ibu ${esc(b.ibu || '–')} · ${esc(b.posyandu || 'posyandu kosong')} · oleh ${esc(b.oleh)}</div></span>
         <div class="deret-tombol" style="flex:none"><button class="tombol kecil" data-aksi="setujuiB" data-id="${esc(b.id)}" data-s="1" ${b.tglLahir && b.jk && b.posyandu ? '' : 'disabled title="Lengkapi data dulu"'}>Setujui</button>
         <button class="tombol bahaya kecil" data-aksi="setujuiB" data-id="${esc(b.id)}" data-s="0">Tolak</button><button class="tombol garis kecil" data-aksi="ke" data-ke="ubah-balita/${esc(b.id)}">Ubah</button></div></div>`).join('')}</div>` : '<div class="kosong" style="padding:14px">Tidak ada.</div>'}
+      ${(d.lansiaKeluar || []).length ? `<div class="judul-bagian">Usulan keluar lansia (${d.lansiaKeluar.length})</div><div class="daftar">${d.lansiaKeluar.map(m => `<div class="item" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(m.nama)}</div>
+        <div class="sub">${esc(m.alasan)} · ${fmtTgl(m.tanggal)} · ${esc(m.posyandu)} · oleh ${esc(m.oleh)}</div></span>
+        <div class="deret-tombol" style="flex:none"><button class="tombol kecil" data-aksi="setujuiKL" data-id="${esc(m.id)}" data-s="1">Setujui</button>
+        <button class="tombol bahaya kecil" data-aksi="setujuiKL" data-id="${esc(m.id)}" data-s="0">Tolak</button></div></div>`).join('')}</div>` : ''}
       <div class="judul-bagian">Usulan keluar (${d.mutasi.length})</div>
       ${d.mutasi.length ? `<div class="daftar">${d.mutasi.map(m => `<div class="item" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(m.nama)}</div>
         <div class="sub">${esc(m.alasan)} · ${fmtTgl(m.tanggal)} · ${esc(m.posyandu)} · oleh ${esc(m.oleh)}${m.keterangan ? ' · ' + esc(m.keterangan) : ''}</div></span>
@@ -1458,6 +1767,7 @@ function viewAkun() {
 const VIEWS = {
   beranda: viewBeranda, ukur: viewUkur, imunisasi: viewImunisasi, risiko: viewRisiko, menu: viewMenu, balita: viewBalita, antrean: viewAntrean,
   'data-balita': viewDataBalita, 'tambah-balita': () => viewFormBalita(''), 'ubah-balita': viewFormBalita, dashboard: viewDashboard, pantau: viewPantau, belum: viewBelum,
+  lansia: viewLansia, 'lansia-profil': viewProfilLansia, 'tambah-lansia': () => viewFormLansia(''), 'ubah-lansia': viewFormLansia,
   persetujuan: viewPersetujuan, laporan: viewLaporan, pengguna: viewPengguna, kunci: viewKunci, akun: viewAkun
 };
 
@@ -1496,6 +1806,23 @@ const AKSI = {
   formVit: el => formVit(el.dataset.id),
   formTL: el => formTL(el.dataset.id),
   formKPSP: el => formKPSP(el.dataset.id),
+  periodeL: el => { S.periodeL = el.dataset.p; render(); },
+  filterL: el => { S.filterL = el.dataset.f; render(); },
+  formPeriksaL: el => formPeriksaL(el.dataset.id, S.periodeL || periodeKini()),
+  formPeriksaLP: el => formPeriksaL(el.dataset.id, el.dataset.p),
+  keluarL: el => formKeluarL(el.dataset.id),
+  hapusPeriksaL: async () => {
+    const f = $('#fPeriksaL'), l = S.d.lansiaById[f.dataset.id];
+    if (!await konfirmasi('Hapus pemeriksaan?', 'Data ' + esc(l.nama) + ' ' + namaPeriode(f.dataset.periode) + ' akan dihapus.', 'Hapus', true)) return;
+    await antrekan('hapusPeriksaLansia', { id: f.dataset.id, periode: f.dataset.periode }, 'Hapus periksa ' + l.nama);
+    tutupLembar(); render(); toast('Pemeriksaan dihapus.');
+  },
+  setujuiKL: async el => {
+    el.disabled = true;
+    const r = await api('prosesKeluarLansia', { id: el.dataset.id, setuju: el.dataset.s === '1' });
+    if (!r.ok) { toast(r.pesan); el.disabled = false; return; }
+    toast(el.dataset.s === '1' ? 'Lansia dikeluarkan.' : 'Usulan ditolak.'); render(); sinkron(true);
+  },
   formPD3I: el => formPD3I(el.dataset.id, el.dataset.lapor),
   mutasi: el => formMutasi(el.dataset.id),
   formUser: el => formUser(el.dataset.i !== undefined ? +el.dataset.i : undefined),
@@ -1618,6 +1945,14 @@ const KIRIM = {
     if (!cocok && !await konfirmasi('Periksa jenis dan usia', `Anak berusia ${usiaTeks(usia)} pada tanggal pemberian, sedangkan anjurannya ${anjuran}. Tetap simpan?`, 'Tetap simpan')) return;
     await antrekan('simpanVitamin', { id: f.dataset.id, jenis: f.jenis.value, tgl: f.tgl.value }, 'Vitamin/obat cacing ' + b.nama);
     tutupLembar(); render(); toast('Tercatat.');
+  },
+  fPeriksaL: f => simpanPeriksaL(f),
+  fLansia: f => simpanLansiaForm(f),
+  fKeluarL: async f => {
+    const l = S.d.lansiaById[f.dataset.id];
+    if (!f.alasan.value) { toast('Pilih alasan.'); return; }
+    await antrekan('usulKeluarLansia', { id: l.id, alasan: f.alasan.value, tanggal: f.tanggal.value, keterangan: rapiSpasi(f.keterangan.value) }, 'Keluar lansia: ' + l.nama);
+    tutupLembar(); toast(admin() ? 'Lansia dikeluarkan dari daftar.' : 'Usulan terkirim ke admin.'); render();
   },
   fKPSP: async f => {
     const b = S.d.byId[f.dataset.id];
