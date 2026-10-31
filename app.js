@@ -1182,7 +1182,16 @@ function viewLaporan() {
     <label class="isian"><span>Periode</span><select id="perLap">${ps.map((p, i) => `<option value="${p}" ${i === 1 ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>
     <button class="tombol penuh" data-aksi="buatLaporan">Buat laporan</button>
     <p class="redup kecil">Laporan otomatis juga dibuat robot setiap tanggal 1 dan dikirim ke email admin. Pembuatan bisa memakan waktu sampai 1 menit.</p>
-    <div id="hasilLap"></div></div><div class="judul-bagian">Laporan tersimpan di Google Drive</div>` + v.html;
+    <div id="hasilLap"></div></div>
+    <div class="kartu"><h2>File impor ePPGBM</h2>
+    <p class="redup kecil" style="margin-top:0">Data pengukuran dalam format "Format Import Data Pengukuran Balita" ePPGBM. Hanya balita yang sudah ditimbang dan punya NIK 16 angka.</p>
+    <div class="grid2">
+      <label class="isian"><span>Periode</span><select id="perEp">${ps.map((p, i) => `<option value="${p}" ${i === 0 ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>
+      <label class="isian"><span>Posyandu</span><select id="posEp">${S.d.posyandu.map(p => `<option ${(S.pos || S.d.posyandu[0]) === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}<option value="">Semua (1 file)</option></select></label>
+    </div>
+    <button class="tombol penuh" data-aksi="unduhEppgbm">${ikon('dokumen', 20)} Unduh file ePPGBM</button>
+    <div id="hasilEp"></div></div>
+    <div class="judul-bagian">Laporan tersimpan di Google Drive</div>` + v.html;
   v.setelah = async () => {
     const r = await api('daftarLaporan', {}); const el = $('#isiOnline'); if (!el) return;
     if (!r.ok) return tampilGagal(r);
@@ -1332,6 +1341,23 @@ const AKSI = {
     h.innerHTML = r.ok ? `<div class="pesan-info" style="margin-top:12px">Laporan ${esc(r.data.nama)} siap.</div><div class="deret-tombol">
       <a class="tombol" href="${esc(r.data.unduh)}" target="_blank" rel="noopener">Unduh Excel</a><a class="tombol garis" href="${esc(r.data.url)}" target="_blank" rel="noopener">Buka di Drive</a></div>`
       : `<div class="pesan-galat" style="margin-top:12px">${esc(r.pesan)}</div>`;
+  },
+  unduhEppgbm: async el => {
+    const p = $('#perEp').value, pos = $('#posEp').value, h = $('#hasilEp'), teks = el.innerHTML;
+    el.disabled = true; el.innerHTML = '<span class="spinner"></span> Menyiapkan file…';
+    const r = await api('eppgbm', { periode: p, posyandu: pos }, { batas: 120000 });
+    el.disabled = false; el.innerHTML = teks;
+    if (!r.ok) { h.innerHTML = `<div class="pesan-galat" style="margin-top:12px">${esc(r.pesan)}</div>`; return; }
+    const d = r.data;
+    if (d.jumlah) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([d.isi], { type: 'application/vnd.ms-excel' }));
+      a.download = d.nama; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    }
+    h.innerHTML = `<div class="${d.jumlah ? 'pesan-info' : 'pesan-awas'}" style="margin-top:12px">${d.jumlah ? `<b>${esc(d.nama)}</b> terunduh: ${d.jumlah} balita.` : 'Belum ada balita ber-NIK yang ditimbang pada periode ini.'}</div>
+      ${d.tanpaNik.length ? `<div class="pesan-awas">${d.tanpaNik.length} balita sudah ditimbang tetapi NIK kosong/tidak 16 angka, jadi tidak masuk file. Lengkapi NIK lewat Data balita:<br>${d.tanpaNik.slice(0, 30).map(x => esc(x.nama) + (pos ? '' : ' (' + esc(x.posyandu) + ')')).join(', ')}${d.tanpaNik.length > 30 ? ', …' : ''}</div>` : ''}
+      ${d.jumlah ? '<p class="redup kecil">Di ePPGBM: menu Import → format pengukuran → pilih file ini. Bila ditolak, buka dulu di Excel lalu Simpan sebagai "Excel 97-2003 Workbook (.xls)".</p>' : ''}`;
   },
   setujuiB: async el => {
     el.disabled = true;
