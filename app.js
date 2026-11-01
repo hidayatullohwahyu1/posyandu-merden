@@ -240,7 +240,8 @@ function hitungLokal(d, b, u) {
   return { id: b.id, periode: u.periode, tglUkur: u.tglUkur, usiaBln: g.usiaBln, bb: +u.bb || '', tb: +u.tb || '', cara: +u.tb ? u.cara : '',
     lila: +u.lila || '', lk: +u.lk || '', zBBU: v(g.zBBU), zTBU: v(g.zTBU), zBBTB: v(g.zBBTB), zLKU: v(g.zLKU),
     stBBU: g.stBBU, stTBU: g.stTBU, stBBTB: g.stBBTB, stLKU: g.stLKU, stLILA: g.stLILA, nt: nt.nt, selisih: v(nt.selisihG),
-    label: lab.label, alasan: lab.alasan.join('; '), tbKoreksi: v(g.tbKoreksi), diubahPada: '', petugas: S.sesi ? S.sesi.user.username : '', edukasi: u.edukasi || '', _lokal: true };
+    label: lab.label, alasan: lab.alasan.join('; '), tbKoreksi: v(g.tbKoreksi), diubahPada: '', petugas: S.sesi ? S.sesi.user.username : '', edukasi: u.edukasi || '',
+    asi: u.asi || '', mpasi: u.mpasi || '', tbcBatuk: u.tbcBatuk || '', tbcDemam: u.tbcDemam || '', tbcKontak: u.tbcKontak || '', mt: u.mt || '', _lokal: true };
 }
 
 /* Terapkan satu perubahan antrean ke data d (tampilan) */
@@ -251,7 +252,8 @@ function terapkanLokal(d, it) {
       if (!b) return;
       (d.ukur[b.id] = d.ukur[b.id] || {})[x.periode] = hitungLokal(d, b, x);
       { const p2 = geserPeriode(x.periode, 1), r2 = d.ukur[b.id][p2];
-        if (r2) d.ukur[b.id][p2] = Object.assign({}, hitungLokal(d, b, { periode: p2, tglUkur: r2.tglUkur, bb: r2.bb, tb: r2.tb, cara: r2.cara, lila: r2.lila, lk: r2.lk, edukasi: r2.edukasi }), { _lokal: r2._lokal }); }
+        if (r2) d.ukur[b.id][p2] = Object.assign({}, hitungLokal(d, b, { periode: p2, tglUkur: r2.tglUkur, bb: r2.bb, tb: r2.tb, cara: r2.cara, lila: r2.lila, lk: r2.lk, edukasi: r2.edukasi,
+          asi: r2.asi, mpasi: r2.mpasi, tbcBatuk: r2.tbcBatuk, tbcDemam: r2.tbcDemam, tbcKontak: r2.tbcKontak, mt: r2.mt }), { _lokal: r2._lokal }); }
       break;
     case 'hapusPengukuran':
       if (d.ukur[x.id]) delete d.ukur[x.id][x.periode];
@@ -988,6 +990,9 @@ function formUkur(id, periode) {
         <label class="isian"><span>Lingkar lengan (LiLA)</span><div class="isian-angka"><input name="lila" inputmode="decimal" enterkeyhint="next" enterkeyhint="next" value="${u ? esc(angka(u.lila).replace('–', '')) : ''}" placeholder="${usia < 6 ? '≥ 6 bln' : '0,0'}" ${dis}><em>cm</em></div>${hint('lila', 'cm')}</label>
         <label class="isian"><span>Lingkar kepala</span><div class="isian-angka"><input name="lk" inputmode="decimal" enterkeyhint="next" enterkeyhint="done" value="${u ? esc(angka(u.lk).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lk', 'cm')}</label>
       </div>
+      ${(() => { const yt = (n, lb) => `<label class="isian"><span>${lb}</span><select name="${n}" ${dis}><option value="">–</option><option value="Y" ${u && u[n] === 'Y' ? 'selected' : ''}>Ya</option><option value="T" ${u && u[n] === 'T' ? 'selected' : ''}>Tidak</option></select></label>`;
+        return `<div class="judul-bagian">Pelayanan (kartu bantu)</div><div class="grid2">${usia < 6 ? yt('asi', 'Masih ASI eksklusif') : ''}${usia >= 6 && usia <= 23 ? yt('mpasi', 'MP-ASI sesuai umur') : ''}${yt('mt', 'Patuh makan MT pangan lokal (bila dapat)')}</div>
+        <div class="judul-bagian">Skrining gejala TBC</div><div class="grid2">${yt('tbcBatuk', 'Batuk terus-menerus')}${yt('tbcDemam', 'Demam ≥ 2 minggu')}${yt('tbcKontak', 'Kontak erat pasien TBC')}</div>`; })()}
       <div class="isian"><span class="redup kecil" style="display:block;margin-bottom:6px;font-weight:550">Edukasi gizi yang diberikan${usia >= 6 && usia <= 23 ? ' (usia MP-ASI)' : ''}</span>
         <div class="chips" style="flex-wrap:wrap">${EDUKASI_BALITA.map(t => { const on = u && String(u.edukasi || '').split(', ').indexOf(t) >= 0;
           return `<label class="chip ${on ? 'aktif' : ''}"><input type="checkbox" name="edu" value="${t}" ${on ? 'checked' : ''} ${dis} style="display:none" onchange="this.parentNode.classList.toggle('aktif',this.checked)">${t}</label>`; }).join('')}</div>
@@ -1012,6 +1017,7 @@ async function simpanUkur(f) {
     x[k] = n === '' ? 0 : n;
   }
   x.edukasi = Array.from(f.querySelectorAll('input[name=edu]:checked')).map(i => i.value).join(', ');
+  ['asi', 'mpasi', 'tbcBatuk', 'tbcDemam', 'tbcKontak', 'mt'].forEach(k => { x[k] = f[k] ? f[k].value : ''; });
   const err = validasiUkur(x, b.tglLahir, b.jk) || (x.tglUkur > hariIni() ? 'Tanggal ukur tidak boleh setelah hari ini.' : '');
   if (err) { $('#galatUkur').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
   if (usiaBulan(b.tglLahir, x.tglUkur) > 60) { $('#galatUkur').innerHTML = `<div class="pesan-galat">Usia sudah lebih dari 60 bulan.</div>`; return; }
@@ -1040,6 +1046,7 @@ function tampilHasil(b, u) {
     ${(() => { const us = usiaBulan(b.tglLahir, u.tglUkur); return us >= 6 && us <= 23 && String(u.edukasi || '').indexOf('MP-ASI') < 0
       ? `<div class="pesan-info">Usia MP-ASI: sampaikan pentingnya <b>protein hewani setiap hari</b> (telur, ikan, ayam, hati). <a href="#/materi-mpasi">Lihat bahan edukasi</a></div>` : ''; })()}
     ${u.edukasi ? `<p class="kecil">Edukasi: ${esc(u.edukasi)}</p>` : ''}
+    ${[u.tbcBatuk, u.tbcDemam, u.tbcKontak].indexOf('Y') >= 0 ? '<div class="pesan-awas">Ada gejala atau kontak TBC: <b>rujuk ke puskesmas atau pustu</b> untuk pemeriksaan TBC, lalu catat di menu Risiko.</div>' : ''}
     <p class="redup kecil">Status bersifat penanda; penentuan dan penanganan oleh tenaga kesehatan.${u.label === 'Merah' ? ' Sampaikan ke orang tua dan catat rujukan di menu Risiko.' : ''}</p>
     <div class="deret-tombol">
       ${berikut ? `<button class="tombol" data-aksi="formUkur" data-id="${esc(berikut.id)}">Berikutnya: ${esc(berikut.nama.split(' ').slice(0, 2).join(' '))} ${ikon('kanan', 18)}</button>` : ''}
@@ -1076,6 +1083,7 @@ function viewBalita(id) {
       <div class="deret-tombol" style="margin-top:12px">
         ${aktif ? `<button class="tombol" data-aksi="formUkurP" data-id="${esc(id)}" data-p="${P}">${ikon('ukur', 20)} Ukur</button>` : ''}
         <button class="tombol garis" data-aksi="ke" data-ke="ubah-balita/${esc(id)}">Ubah data</button>
+        <button class="tombol garis" data-aksi="kartuBantu" data-id="${esc(id)}">${ikon('dokumen', 20)} Kartu Bantu (PDF)</button>
         ${!aktif && admin() ? `<button class="tombol garis" data-aksi="aktifkan" data-id="${esc(id)}">Aktifkan lagi</button>` : ''}
       </div>
       ${aktif ? tombolPindah('balita', id) : ''}
@@ -2344,6 +2352,7 @@ function viewDataBalita() {
     <div class="cari">${ikon('cari', 20)}<input id="cariB" type="search" placeholder="Cari nama, nama ibu, atau NIK" value="${esc(S.cariB || '')}" autocomplete="off"></div>
     <div class="chips">${filter.map(f => `<button class="chip ${S.filterBalita === f ? 'aktif' : ''}" data-aksi="filterBalita" data-f="${f}">${f}</button>`).join('')}</div>
     <button class="tombol garis penuh" data-aksi="ke" data-ke="tambah-balita" style="margin-bottom:10px">${ikon('tambah', 20)} Tambah balita</button>
+    <button class="tombol garis penuh" data-aksi="kartuBantu" data-pos="1" style="margin-bottom:10px">${ikon('dokumen', 20)} Kartu Bantu semua balita ${admin() ? (S.pos ? esc(S.pos) : '(pilih posyandu)') : esc(S.sesi.user.posyandu)} (PDF)</button>
     <div id="daftarB"></div>`,
     setelah: () => { isiDataBalita(); const c = $('#cariB'); c.addEventListener('input', () => { S.cariB = c.value; isiDataBalita(); }); } };
 }
@@ -2840,6 +2849,23 @@ const AKSI = {
     if (S.swBaru || S.swReg.waiting) { S.swBaru = S.swBaru || S.swReg.waiting; if (!cobaPerbarui()) toast('Versi baru siap. Tutup formulir dulu, lalu coba lagi.'); }
     else if (S.swReg.installing) toast('Mengunduh versi baru… aplikasi akan dimuat ulang sendiri.', 4500);
     else toast('Aplikasi sudah versi terbaru (' + C.VERSI + ').');
+  },
+  kartuBantu: async el => {
+    // Kartu Bantu Pemeriksaan Bayi, Balita, dan Apras: diisi server dari template desa, hasilnya PDF siap cetak
+    if (!S.online) { toast('Perlu sinyal untuk membuat Kartu Bantu.'); return; }
+    if (S.antrean.some(o => o.status === 'menunggu')) { await kirimAntrean(); }
+    const semua = !!el.dataset.pos, pos = admin() ? S.pos : S.sesi.user.posyandu;
+    if (semua && !pos) { toast('Pilih posyandu dulu di atas daftar.'); return; }
+    const teks = el.innerHTML; el.disabled = true;
+    el.innerHTML = `<span class="spinner"></span> ${semua ? 'Menyiapkan kartu semua balita (1–3 menit)…' : 'Menyiapkan kartu…'}`;
+    const r = await api('kartuBantu', semua ? { posyandu: pos } : { id: el.dataset.id }, { batas: 330000 });
+    el.disabled = false; el.innerHTML = teks;
+    if (!r.ok) { toast(r.pesan, 5000); return; }
+    bukaLembar(`<h3>Kartu Bantu siap</h3><div class="redup kecil" style="margin-bottom:12px">${esc(r.data.nama)} · ${r.data.jumlah} anak · tersimpan di folder Drive desa</div>
+      <div class="pesan-info">Cetak bolak-balik: halaman <b>Depan</b> lalu <b>Belakang</b> untuk setiap anak. Isian yang belum dicatat di aplikasi dibiarkan kosong untuk diisi tangan.</div>
+      <div class="deret-tombol" style="margin-top:12px"><a class="tombol" href="${esc(r.data.unduh)}" target="_blank" rel="noopener">Unduh PDF</a>
+      <a class="tombol garis" href="${esc(r.data.url)}" target="_blank" rel="noopener">Buka di Drive</a></div>
+      <button type="button" class="tombol garis penuh" style="margin-top:10px" data-aksi="tutup">Tutup</button>`);
   },
   buatLaporan: async el => {
     const p = $('#perLap').value, h = $('#hasilLap');
