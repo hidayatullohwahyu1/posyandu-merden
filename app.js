@@ -1012,7 +1012,7 @@ async function simpanUkur(f) {
     x[k] = n === '' ? 0 : n;
   }
   x.edukasi = Array.from(f.querySelectorAll('input[name=edu]:checked')).map(i => i.value).join(', ');
-  const err = validasiUkur(x, b.tglLahir, b.jk);
+  const err = validasiUkur(x, b.tglLahir, b.jk) || (x.tglUkur > hariIni() ? 'Tanggal ukur tidak boleh setelah hari ini.' : '');
   if (err) { $('#galatUkur').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
   if (usiaBulan(b.tglLahir, x.tglUkur) > 60) { $('#galatUkur').innerHTML = `<div class="pesan-galat">Usia sudah lebih dari 60 bulan.</div>`; return; }
   const lalu = ukurDi(id, geserPeriode(periode, -1));
@@ -1482,7 +1482,7 @@ async function simpanPeriksaL(f) {
     if (Number.isNaN(n)) { $('#galatPL').innerHTML = `<div class="pesan-galat">${nama[k]} harus berupa angka.</div>`; return; }
     x[k] = n === '' ? 0 : n;
   }
-  const err = validasiLansia(x) || (x.tgl < l.tglLahir ? 'Tanggal periksa sebelum tanggal lahir.' : '');
+  const err = validasiLansia(x) || (x.tgl < l.tglLahir ? 'Tanggal periksa sebelum tanggal lahir.' : x.tgl > hariIni() ? 'Tanggal pemeriksaan tidak boleh setelah hari ini.' : '');
   if (err) { $('#galatPL').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
   const lalu = periksaTerakhir(id), w = [];
   if (lalu && lalu.periode < periode && +lalu.bb && x.bb && Math.abs(x.bb - lalu.bb) > 5) w.push('Berat badan berubah lebih dari 5 kg dari pemeriksaan terakhir (' + angka(lalu.bb) + ' kg).');
@@ -1852,7 +1852,7 @@ async function simpanPeriksaBumilForm(f) {
     if (Number.isNaN(n)) { $('#galatPB').innerHTML = `<div class="pesan-galat">${nama[k]} harus berupa angka.</div>`; return; }
     x[k] = n === '' ? (k === 'ttdJumlah' ? '' : 0) : n;
   }
-  const err = validasiBumil(x) || (x.tgl < x0.hpht ? 'Tanggal kunjungan sebelum HPHT.' : '');
+  const err = validasiBumil(x) || (x.tgl < x0.hpht ? 'Tanggal kunjungan sebelum HPHT.' : x.tgl > hariIni() ? 'Tanggal kunjungan tidak boleh setelah hari ini.' : '');
   if (err) { $('#galatPB').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
   if (x.bahaya && !await konfirmasi('Ada tanda bahaya', 'Minta ibu <b>segera ke bidan atau Puskesmas</b>. Data ini juga dilaporkan ke admin desa.', 'Simpan & laporkan', true)) return;
   await antrekan('simpanPeriksaBumil', x, 'Kunjungan ibu hamil ' + x0.nama + ' (' + namaPeriode(periode) + ')');
@@ -2893,6 +2893,14 @@ const AKSI = {
   }
 };
 
+/* Tanggal keluar tidak boleh sebelum layanan terakhir yang tercatat (kecuali data ganda) */
+function tglKeluarSah(f, tanggal) {
+  const terakhir = tanggal.filter(Boolean).sort().pop();
+  if (f.alasan.value === 'Data ganda/salah input' || !terakhir || f.tanggal.value >= terakhir) return true;
+  toast('Tanggal keluar sebelum layanan terakhir (' + fmtTgl(terakhir) + '). Periksa tanggalnya.', 4500);
+  return false;
+}
+
 /* Kirim formulir */
 const KIRIM = {
   fLogin: f => kirimLogin(f),
@@ -2947,6 +2955,7 @@ const KIRIM = {
   fKeluarIbu: async f => {
     const x = S.d.ibuById[f.dataset.id];
     if (!f.alasan.value) { toast('Pilih alasan.'); return; }
+    if (!tglKeluarSah(f, Object.values(S.d.periksaIbu[x.id] || {}).map(u => u.tgl).concat(Object.values(S.d.nifasIbu[x.id] || {}).map(u => u.tgl)))) return;
     await antrekan('usulKeluarIbu', { id: x.id, alasan: f.alasan.value, tanggal: f.tanggal.value, keterangan: rapiSpasi(f.keterangan.value) }, 'Keluar ibu: ' + x.nama);
     tutupLembar(); toast(admin() ? 'Ibu dikeluarkan dari daftar.' : 'Usulan terkirim ke admin.'); render();
   },
@@ -2966,6 +2975,7 @@ const KIRIM = {
   fKeluarL: async f => {
     const l = S.d.lansiaById[f.dataset.id];
     if (!f.alasan.value) { toast('Pilih alasan.'); return; }
+    if (!tglKeluarSah(f, Object.values(S.d.periksaL[l.id] || {}).map(u => u.tgl).concat(Object.values(S.d.skriningL[l.id] || {}).map(u => u.tgl)))) return;
     await antrekan('usulKeluarLansia', { id: l.id, alasan: f.alasan.value, tanggal: f.tanggal.value, keterangan: rapiSpasi(f.keterangan.value) }, 'Keluar lansia: ' + l.nama);
     tutupLembar(); toast(admin() ? 'Lansia dikeluarkan dari daftar.' : 'Usulan terkirim ke admin.'); render();
   },
@@ -3000,6 +3010,7 @@ const KIRIM = {
   fMutasi: async f => {
     const b = S.d.byId[f.dataset.id];
     if (!f.alasan.value) { toast('Pilih alasan.'); return; }
+    if (!tglKeluarSah(f, Object.values(S.d.ukur[b.id] || {}).map(u => u.tglUkur))) return;
     await antrekan('usulMutasi', { id: f.dataset.id, jenis: 'Keluar', alasan: f.alasan.value, tanggal: f.tanggal.value, keterangan: rapiSpasi(f.keterangan.value) }, 'Keluar: ' + b.nama);
     tutupLembar(); toast(admin() ? 'Balita dikeluarkan dari daftar.' : 'Usulan terkirim ke admin.'); render();
   },
