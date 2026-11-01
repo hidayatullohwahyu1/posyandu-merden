@@ -739,7 +739,7 @@ function viewLogin() {
     <div class="login-atas">
       <img class="logo-besar" src="icons/icon-192.png" alt="">
       <h1>${esc(C.NAMA)}</h1>
-      <p>Layanan posyandu ILP balita &amp; lansia ${esc(C.DESA)}</p>
+      <p>Layanan posyandu ILP ibu hamil, balita &amp; lansia ${esc(C.DESA)}</p>
     </div>
     <div class="login-kartu">
     <h2 style="margin:0 0 14px;font-size:1.1rem">Masuk ke akun Anda</h2>
