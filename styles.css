@@ -7,8 +7,8 @@
   --latar: #f2f5fa;
   --kartu: #ffffff;
   --teks: #141b2d;
-  --teks-2: #5b6478;
-  --garis: #e4e9f2;
+  --teks-2: #454e60;          /* lebih gelap agar terbaca di bawah matahari (kontras >= 7:1) */
+  --garis: #d8dfeb;
   --bayang: 0 2px 10px rgba(20, 40, 90, .07), 0 1px 2px rgba(20, 40, 90, .05);
   --bayang-kuat: 0 10px 30px rgba(11, 87, 208, .18);
   --merah: #d92d20; --merah-bg: #fdecea;
@@ -55,7 +55,7 @@ main { padding: 16px 14px calc(var(--nav-h) + 34px + env(safe-area-inset-bottom)
 .kartu h2 { font-size: 1.02rem; margin: 0 0 10px; font-weight: 700; }
 .judul-bagian { margin: 22px 4px 10px; color: var(--teks); font-size: 1rem; font-weight: 700; }
 .redup { color: var(--teks-2); }
-.kecil { font-size: .85rem; }
+.kecil { font-size: .88rem; }
 .baris { display: flex; align-items: center; gap: 10px; }
 .baris.antara { justify-content: space-between; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -140,8 +140,8 @@ button.angka { text-align: left; width: 100%; display: flex; flex-direction: col
 
 /* ---------- Form ---------- */
 label.isian { display: block; margin-bottom: 12px; }
-label.isian > span { display: block; font-size: .85rem; color: var(--teks-2); margin-bottom: 5px; font-weight: 600; }
-input, select, textarea { width: 100%; min-height: 50px; padding: 10px 13px; border-radius: 13px; border: 1.5px solid #dbe2ee; background: #f8fafd; font-size: 1rem; }
+label.isian > span { display: block; font-size: .9rem; color: var(--teks); margin-bottom: 6px; font-weight: 650; }
+input, select, textarea { width: 100%; min-height: 52px; padding: 10px 13px; border-radius: 13px; border: 2px solid #c7d0de; background: #fff; font-size: 1.02rem; }
 textarea { min-height: 84px; }
 input:focus, select:focus, textarea:focus { outline: 0; border-color: var(--utama); background: #fff; box-shadow: 0 0 0 4px rgba(20,104,229,.14); }
 input[disabled], select[disabled] { opacity: .6; }
@@ -165,7 +165,7 @@ input[disabled], select[disabled] { opacity: .6; }
 .chip.aktif { background: var(--utama); color: #fff; box-shadow: 0 4px 12px rgba(20,104,229,.28); }
 
 /* label status */
-.lbl { display: inline-flex; align-items: center; gap: 4px; font-size: .76rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.lbl { display: inline-flex; align-items: center; gap: 4px; font-size: .8rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
 .lbl.Merah { background: var(--merah-bg); color: var(--merah); }
 .lbl.Kuning { background: var(--kuning-bg); color: var(--kuning); }
 .lbl.Hijau { background: var(--oke-bg); color: var(--oke); }
@@ -180,7 +180,7 @@ input[disabled], select[disabled] { opacity: .6; }
 .item:active { background: var(--utama-muda); }
 .item .isi { flex: 1; min-width: 0; }
 .item .nama { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item .sub { font-size: .82rem; color: var(--teks-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item .sub { font-size: .87rem; color: var(--teks-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item .sub.dua { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--teks); }
 .avatar { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; flex: none; font-weight: 800; font-size: .88rem; color: #fff; }
 .avatar.L { background: linear-gradient(135deg, #4c9dff, #1468e5); } .avatar.P { background: linear-gradient(135deg, #ff7eb0, #d3306f); }
@@ -311,3 +311,26 @@ nav.bawah button.tengah.aktif { color: var(--utama); }
 .hero-kartu.ibu .label-kecil::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--merahmuda); margin-right: 6px; vertical-align: 1px; }
 /* pilihan centang (label.chip) boleh dua baris agar teks panjang tidak terpotong */
 .chips label.chip { white-space: normal; max-width: 100%; border-radius: 14px; height: auto; min-height: 40px; line-height: 1.3; padding-top: 8px; padding-bottom: 8px; text-align: left; }
+
+/* ---------- Kerja cepat di lapangan (v2.2) ---------- */
+/* Tombol Simpan di lembar isian selalu terlihat, tidak perlu menggulir ke bawah */
+.lembar form > button[type=submit].penuh { position: sticky; bottom: 0; z-index: 3; box-shadow: 0 -6px 16px rgba(255,255,255,.95), 0 6px 16px rgba(20,104,229,.25); }
+.lembar form { padding-bottom: 4px; }
+
+/* ---------- Mode luar ruangan: teks besar, kontras tinggi, tanpa bayangan tipis ---------- */
+html.luar { font-size: 18px; }
+html.luar:root { --latar: #ffffff; --teks: #0b0f19; --teks-2: #252d3b; --garis: #aeb8c8; --abu: #3a4252;
+  --merah: #b3170c; --kuning: #7a4200; --oke: #0b6644; --biru: #0b4fb8; --utama: #0b57d0; }
+html.luar body { background: #fff; }
+html.luar .kartu, html.luar .daftar, html.luar .angka, html.luar .ubin, html.luar .layanan, html.luar .hero-kartu, html.luar .banner {
+  box-shadow: none; border: 2px solid var(--garis); }
+html.luar .item { border-bottom: 1.5px solid var(--garis); }
+html.luar .redup, html.luar .item .sub, html.luar .vaksin .nm small { color: var(--teks-2); }
+html.luar input, html.luar select, html.luar textarea { border: 2.5px solid #7d8899; font-size: 1.05rem; }
+html.luar .lbl { font-size: .85rem; border: 1.5px solid currentColor; }
+html.luar .lbl.Merah { background: var(--merah); color: #fff; } html.luar .lbl.Kuning { background: #f5b400; color: #1b1300; border-color: #a77a00; }
+html.luar .lbl.Hijau { background: var(--oke); color: #fff; }
+html.luar .pesan-awas, html.luar .pesan-galat, html.luar .pesan-info { border: 2px solid currentColor; font-weight: 600; }
+html.luar .chip { border: 2px solid var(--garis); }
+html.luar .chip.aktif { border-color: var(--utama); }
+html.luar .hero-kartu .label-kecil, html.luar .judul-sub, html.luar .layanan-judul { color: var(--teks); }

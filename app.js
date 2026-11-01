@@ -744,7 +744,7 @@ function viewLogin() {
     ${S.galatLogin ? `<div class="pesan-awas">${esc(S.galatLogin)}</div>` : ''}
     <form id="fLogin" autocomplete="on">
       <label class="isian"><span>Username</span><input name="username" autocapitalize="none" autocomplete="username" required></label>
-      <label class="isian"><span>PIN</span><input name="pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>
+      <label class="isian"><span>PIN</span><input name="pin" type="password" inputmode="numeric" enterkeyhint="next" autocomplete="current-password" required></label>
       <div id="galat"></div>
       <button class="tombol penuh" type="submit">Masuk</button>
     </form>
@@ -963,15 +963,15 @@ function formUkur(id, periode) {
     <form id="fUkur" data-id="${esc(id)}" data-periode="${periode}" data-ada="${u ? 1 : 0}" data-base="${u ? esc(u.diubahPada || '') : ''}">
       <label class="isian"><span>Tanggal ukur</span><input type="date" name="tglUkur" value="${tglDefault}" min="${awalPeriode(periode)}" max="${maxTgl}" required ${dis}></label>
       <div class="grid2">
-        <label class="isian"><span>Berat badan</span><div class="isian-angka"><input name="bb" inputmode="decimal" enterkeyhint="next" value="${u ? esc(angka(u.bb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>kg</em></div>${hint('bb', 'kg')}</label>
-        <label class="isian"><span>${usia < 24 ? 'Panjang' : 'Tinggi'} badan</span><div class="isian-angka"><input name="tb" inputmode="decimal" enterkeyhint="next" value="${u ? esc(angka(u.tb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('tb', 'cm')}</label>
+        <label class="isian"><span>Berat badan</span><div class="isian-angka"><input name="bb" inputmode="decimal" enterkeyhint="next" enterkeyhint="next" value="${u ? esc(angka(u.bb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>kg</em></div>${hint('bb', 'kg')}</label>
+        <label class="isian"><span>${usia < 24 ? 'Panjang' : 'Tinggi'} badan</span><div class="isian-angka"><input name="tb" inputmode="decimal" enterkeyhint="next" enterkeyhint="next" value="${u ? esc(angka(u.tb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('tb', 'cm')}</label>
       </div>
       <label class="isian"><span>Cara ukur panjang/tinggi</span><select name="cara" ${dis}>
         <option value="Berbaring" ${cara === 'Berbaring' ? 'selected' : ''}>Berbaring (anjuran usia &lt; 2 tahun)</option>
         <option value="Berdiri" ${cara === 'Berdiri' ? 'selected' : ''}>Berdiri (anjuran usia ≥ 2 tahun)</option></select></label>
       <div class="grid2">
-        <label class="isian"><span>Lingkar lengan (LiLA)</span><div class="isian-angka"><input name="lila" inputmode="decimal" enterkeyhint="next" value="${u ? esc(angka(u.lila).replace('–', '')) : ''}" placeholder="${usia < 6 ? '≥ 6 bln' : '0,0'}" ${dis}><em>cm</em></div>${hint('lila', 'cm')}</label>
-        <label class="isian"><span>Lingkar kepala</span><div class="isian-angka"><input name="lk" inputmode="decimal" enterkeyhint="done" value="${u ? esc(angka(u.lk).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lk', 'cm')}</label>
+        <label class="isian"><span>Lingkar lengan (LiLA)</span><div class="isian-angka"><input name="lila" inputmode="decimal" enterkeyhint="next" enterkeyhint="next" value="${u ? esc(angka(u.lila).replace('–', '')) : ''}" placeholder="${usia < 6 ? '≥ 6 bln' : '0,0'}" ${dis}><em>cm</em></div>${hint('lila', 'cm')}</label>
+        <label class="isian"><span>Lingkar kepala</span><div class="isian-angka"><input name="lk" inputmode="decimal" enterkeyhint="next" enterkeyhint="done" value="${u ? esc(angka(u.lk).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lk', 'cm')}</label>
       </div>
       <div class="isian"><span class="redup kecil" style="display:block;margin-bottom:6px;font-weight:550">Edukasi gizi yang diberikan${usia >= 6 && usia <= 23 ? ' (usia MP-ASI)' : ''}</span>
         <div class="chips" style="flex-wrap:wrap">${EDUKASI_BALITA.map(t => { const on = u && String(u.edukasi || '').split(', ').indexOf(t) >= 0;
@@ -1385,20 +1385,20 @@ function formPeriksaL(id, periode) {
     <form id="fPeriksaL" data-id="${esc(id)}" data-periode="${periode}">
       <label class="isian"><span>Tanggal periksa</span><input type="date" name="tgl" value="${tglDef}" min="${awalPeriode(periode)}" max="${maxTgl}" required ${dis}></label>
       <div class="grid2">
-        <label class="isian"><span>Berat badan</span><div class="isian-angka"><input name="bb" inputmode="decimal" value="${nilai('bb')}" placeholder="0,0" ${dis}><em>kg</em></div>${hint('bb', 'kg')}</label>
-        <label class="isian"><span>Tinggi badan</span><div class="isian-angka"><input name="tb" inputmode="decimal" value="${u ? nilai('tb') : (lalu && lalu.tb ? esc(angka(lalu.tb)) : '')}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('tb', 'cm')}</label>
+        <label class="isian"><span>Berat badan</span><div class="isian-angka"><input name="bb" inputmode="decimal" enterkeyhint="next" value="${nilai('bb')}" placeholder="0,0" ${dis}><em>kg</em></div>${hint('bb', 'kg')}</label>
+        <label class="isian"><span>Tinggi badan</span><div class="isian-angka"><input name="tb" inputmode="decimal" enterkeyhint="next" value="${u ? nilai('tb') : (lalu && lalu.tb ? esc(angka(lalu.tb)) : '')}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('tb', 'cm')}</label>
       </div>
-      <label class="isian"><span>Lingkar perut</span><div class="isian-angka"><input name="lp" inputmode="decimal" value="${nilai('lp')}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lp', 'cm')}</label>
+      <label class="isian"><span>Lingkar perut</span><div class="isian-angka"><input name="lp" inputmode="decimal" enterkeyhint="next" value="${nilai('lp')}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lp', 'cm')}</label>
       <div class="grid2">
-        <label class="isian"><span>Sistol (angka atas)</span><div class="isian-angka"><input name="sistol" inputmode="numeric" value="${nilai('sistol')}" placeholder="120" ${dis}><em>mmHg</em></div>${lalu && +lalu.sistol ? `<div class="lalu">${namaPeriode(lalu.periode).split(' ')[0]}: ${tdTeks(lalu)}</div>` : ''}</label>
-        <label class="isian"><span>Diastol (angka bawah)</span><div class="isian-angka"><input name="diastol" inputmode="numeric" value="${nilai('diastol')}" placeholder="80" ${dis}><em>mmHg</em></div></label>
+        <label class="isian"><span>Sistol (angka atas)</span><div class="isian-angka"><input name="sistol" inputmode="numeric" enterkeyhint="next" value="${nilai('sistol')}" placeholder="120" ${dis}><em>mmHg</em></div>${lalu && +lalu.sistol ? `<div class="lalu">${namaPeriode(lalu.periode).split(' ')[0]}: ${tdTeks(lalu)}</div>` : ''}</label>
+        <label class="isian"><span>Diastol (angka bawah)</span><div class="isian-angka"><input name="diastol" inputmode="numeric" enterkeyhint="next" value="${nilai('diastol')}" placeholder="80" ${dis}><em>mmHg</em></div></label>
       </div>
       <div class="judul-bagian" style="margin-top:4px">Laboratorium (bila diperiksa)</div>
       <div class="grid2">
-        <label class="isian"><span>Gula darah</span><div class="isian-angka"><input name="gd" inputmode="numeric" value="${nilai('gd')}" placeholder="–" ${dis}><em>mg/dL</em></div></label>
+        <label class="isian"><span>Gula darah</span><div class="isian-angka"><input name="gd" inputmode="numeric" enterkeyhint="next" value="${nilai('gd')}" placeholder="–" ${dis}><em>mg/dL</em></div></label>
         <label class="isian"><span>Jenis gula darah</span><select name="jenisGD" ${dis}><option value="Sewaktu">Sewaktu</option><option value="Puasa" ${u && u.jenisGD === 'Puasa' ? 'selected' : ''}>Puasa</option></select></label>
-        <label class="isian"><span>Kolesterol total</span><div class="isian-angka"><input name="kol" inputmode="numeric" value="${nilai('kol')}" placeholder="–" ${dis}><em>mg/dL</em></div></label>
-        <label class="isian"><span>Asam urat</span><div class="isian-angka"><input name="au" inputmode="decimal" value="${nilai('au')}" placeholder="–" ${dis}><em>mg/dL</em></div></label>
+        <label class="isian"><span>Kolesterol total</span><div class="isian-angka"><input name="kol" inputmode="numeric" enterkeyhint="next" value="${nilai('kol')}" placeholder="–" ${dis}><em>mg/dL</em></div></label>
+        <label class="isian"><span>Asam urat</span><div class="isian-angka"><input name="au" inputmode="decimal" enterkeyhint="next" value="${nilai('au')}" placeholder="–" ${dis}><em>mg/dL</em></div></label>
       </div>
       <div class="grid2">
         <label class="isian"><span>Minum obat rutin</span>${yt('obat', u ? u.obat : (lalu ? lalu.obat : ''))}</label>
@@ -1512,11 +1512,11 @@ function viewFormLansia(id) {
         <label class="isian"><span>Jenis kelamin *</span><select name="jk" required><option value="">Pilih…</option><option value="L" ${l && l.jk === 'L' ? 'selected' : ''}>Laki-laki</option><option value="P" ${l && l.jk === 'P' ? 'selected' : ''}>Perempuan</option></select></label>
         <label class="isian"><span>Tanggal lahir *</span><input type="date" name="tglLahir" value="${v('tglLahir')}" max="${hariIni()}" required></label>
       </div>
-      <label class="isian"><span>NIK (16 angka)</span><input name="nik" inputmode="numeric" maxlength="16" placeholder="${l && l.nik ? esc(l.nik) + ' — isi untuk mengganti' : 'Kosongkan jika tidak tahu'}" value="${admin() ? v('nik') : ''}"></label>
-      <label class="isian"><span>No KK (16 angka)</span><input name="kk" inputmode="numeric" maxlength="16" placeholder="${l && l.kk ? esc(l.kk) + ' — isi untuk mengganti' : ''}" value="${admin() ? v('kk') : ''}"></label>
+      <label class="isian"><span>NIK (16 angka)</span><input name="nik" inputmode="numeric" enterkeyhint="next" maxlength="16" placeholder="${l && l.nik ? esc(l.nik) + ' — isi untuk mengganti' : 'Kosongkan jika tidak tahu'}" value="${admin() ? v('nik') : ''}"></label>
+      <label class="isian"><span>No KK (16 angka)</span><input name="kk" inputmode="numeric" enterkeyhint="next" maxlength="16" placeholder="${l && l.kk ? esc(l.kk) + ' — isi untuk mengganti' : ''}" value="${admin() ? v('kk') : ''}"></label>
       <div class="grid3">
-        <label class="isian"><span>RT</span><input name="rt" inputmode="numeric" maxlength="3" placeholder="001" value="${l && l.rt ? String(l.rt).padStart(3, '0') : ''}"></label>
-        <label class="isian"><span>RW</span><input name="rw" inputmode="numeric" maxlength="3" placeholder="002" value="${l && l.rw ? String(l.rw).padStart(3, '0') : ''}"></label>
+        <label class="isian"><span>RT</span><input name="rt" inputmode="numeric" enterkeyhint="next" maxlength="3" placeholder="001" value="${l && l.rt ? String(l.rt).padStart(3, '0') : ''}"></label>
+        <label class="isian"><span>RW</span><input name="rw" inputmode="numeric" enterkeyhint="next" maxlength="3" placeholder="002" value="${l && l.rw ? String(l.rw).padStart(3, '0') : ''}"></label>
         <label class="isian"><span>Dusun</span><input name="dusun" list="daftarDusun" value="${v('dusun')}" autocapitalize="characters"><datalist id="daftarDusun">${dusun.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
       </div>
       ${admin() ? `<label class="isian"><span>Posyandu *</span><select name="posyandu" required>${S.d.posyandu.map(p => `<option ${(l ? l.posyandu : S.pos) === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>` : ''}
@@ -1756,21 +1756,21 @@ function formPeriksaBumil(id, periode) {
       <label class="isian"><span>Tanggal kunjungan</span><input type="date" name="tgl" value="${tglDef}" min="${awalPeriode(periode)}" max="${maxTgl}" required ${dis}></label>
       <div class="isian"><span style="color:var(--merah)">Tanda bahaya yang dialami ibu (centang bila ada)</span>${chips('bahaya', TANDA_BAHAYA_HAMIL, u ? u.bahaya : '', true)}</div>
       <div class="grid2">
-        <label class="isian"><span>Berat badan</span><div class="isian-angka"><input name="bb" inputmode="decimal" value="${nilai('bb')}" placeholder="0,0" ${dis}><em>kg</em></div>${hint('bb', 'kg')}</label>
-        <label class="isian"><span>LiLA</span><div class="isian-angka"><input name="lila" inputmode="decimal" value="${nilai('lila')}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lila', 'cm')}</label>
-        <label class="isian"><span>Sistol (angka atas)</span><div class="isian-angka"><input name="sistol" inputmode="numeric" value="${nilai('sistol')}" placeholder="110" ${dis}><em>mmHg</em></div></label>
-        <label class="isian"><span>Diastol (angka bawah)</span><div class="isian-angka"><input name="diastol" inputmode="numeric" value="${nilai('diastol')}" placeholder="70" ${dis}><em>mmHg</em></div></label>
+        <label class="isian"><span>Berat badan</span><div class="isian-angka"><input name="bb" inputmode="decimal" enterkeyhint="next" value="${nilai('bb')}" placeholder="0,0" ${dis}><em>kg</em></div>${hint('bb', 'kg')}</label>
+        <label class="isian"><span>LiLA</span><div class="isian-angka"><input name="lila" inputmode="decimal" enterkeyhint="next" value="${nilai('lila')}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lila', 'cm')}</label>
+        <label class="isian"><span>Sistol (angka atas)</span><div class="isian-angka"><input name="sistol" inputmode="numeric" enterkeyhint="next" value="${nilai('sistol')}" placeholder="110" ${dis}><em>mmHg</em></div></label>
+        <label class="isian"><span>Diastol (angka bawah)</span><div class="isian-angka"><input name="diastol" inputmode="numeric" enterkeyhint="next" value="${nilai('diastol')}" placeholder="70" ${dis}><em>mmHg</em></div></label>
       </div>
       <div class="judul-sub" style="margin-top:4px">Dari buku KIA</div>
       <div class="grid2">
         <label class="isian"><span>Periksa ke bidan/dokter bulan ini</span><select name="anc" ${dis}><option value="">–</option><option value="Y" ${u && u.anc === 'Y' ? 'selected' : ''}>Ya</option><option value="T" ${u && u.anc === 'T' ? 'selected' : ''}>Belum</option></select></label>
         <label class="isian"><span>Tanggal periksa</span><input type="date" name="tglANC" value="${u && u.tglANC ? u.tglANC : ''}" max="${hariIni()}" ${dis}></label>
         <label class="isian"><span>Tempat periksa</span><select name="tempatANC" ${dis}><option value="">–</option>${TEMPAT_ANC.map(t => `<option ${u && u.tempatANC === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-        <label class="isian"><span>Hb (bila tertulis)</span><div class="isian-angka"><input name="hb" inputmode="decimal" value="${nilai('hb')}" placeholder="–" ${dis}><em>g/dL</em></div></label>
+        <label class="isian"><span>Hb (bila tertulis)</span><div class="isian-angka"><input name="hb" inputmode="decimal" enterkeyhint="next" value="${nilai('hb')}" placeholder="–" ${dis}><em>g/dL</em></div></label>
       </div>
       <div class="grid2">
         <label class="isian"><span>Minum TTD bulan ini</span><select name="ttd" ${dis}><option value="">–</option>${['Rutin', 'Tidak teratur', 'Tidak minum'].map(t => `<option ${u && u.ttd === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-        <label class="isian"><span>Jumlah TTD diminum</span><div class="isian-angka"><input name="ttdJumlah" inputmode="numeric" value="${u && u.ttdJumlah !== '' && u.ttdJumlah !== undefined ? u.ttdJumlah : ''}" placeholder="30" ${dis}><em>tablet</em></div></label>
+        <label class="isian"><span>Jumlah TTD diminum</span><div class="isian-angka"><input name="ttdJumlah" inputmode="numeric" enterkeyhint="next" value="${u && u.ttdJumlah !== '' && u.ttdJumlah !== undefined ? u.ttdJumlah : ''}" placeholder="30" ${dis}><em>tablet</em></div></label>
       </div>
       <label class="isian"><span>Ikut kelas ibu hamil bulan ini</span><select name="kelas" ${dis}><option value="">–</option><option value="Y" ${u && u.kelas === 'Y' ? 'selected' : ''}>Ya</option><option value="T" ${u && u.kelas === 'T' ? 'selected' : ''}>Tidak</option></select></label>
       <div class="isian"><span class="redup kecil" style="display:block;margin-bottom:6px;font-weight:550">Edukasi yang diberikan</span>${chips('edu', EDUKASI_BUMIL, u ? u.edukasi : '')}
@@ -1890,19 +1890,19 @@ function viewFormIbu(id) {
         <label class="isian"><span>Keguguran (A)</span>${angkaPil('abortus', x ? x.abortus : '', 0)}</label>
       </div>
       <label class="isian"><span>Tanggal persalinan terakhir (bila pernah)</span><input type="date" name="tglPersalinanAkhir" value="${v('tglPersalinanAkhir')}" max="${hariIni()}"></label>
-      <label class="isian"><span>NIK ibu (16 angka)</span><input name="nik" inputmode="numeric" maxlength="16" placeholder="${x && x.nik ? esc(x.nik) + ' — isi untuk mengganti' : 'Kosongkan jika tidak tahu'}" value="${admin() ? v('nik') : ''}"></label>
-      <label class="isian"><span>No KK (16 angka)</span><input name="kk" inputmode="numeric" maxlength="16" placeholder="${x && x.kk ? esc(x.kk) + ' — isi untuk mengganti' : ''}" value="${admin() ? v('kk') : ''}"></label>
+      <label class="isian"><span>NIK ibu (16 angka)</span><input name="nik" inputmode="numeric" enterkeyhint="next" maxlength="16" placeholder="${x && x.nik ? esc(x.nik) + ' — isi untuk mengganti' : 'Kosongkan jika tidak tahu'}" value="${admin() ? v('nik') : ''}"></label>
+      <label class="isian"><span>No KK (16 angka)</span><input name="kk" inputmode="numeric" enterkeyhint="next" maxlength="16" placeholder="${x && x.kk ? esc(x.kk) + ' — isi untuk mengganti' : ''}" value="${admin() ? v('kk') : ''}"></label>
       <label class="isian"><span>Nama suami</span><input name="suami" value="${v('suami')}" autocapitalize="characters" maxlength="60"></label>
       <div class="grid3">
-        <label class="isian"><span>RT</span><input name="rt" inputmode="numeric" maxlength="3" placeholder="001" value="${x && x.rt ? String(x.rt).padStart(3, '0') : ''}"></label>
-        <label class="isian"><span>RW</span><input name="rw" inputmode="numeric" maxlength="3" placeholder="002" value="${x && x.rw ? String(x.rw).padStart(3, '0') : ''}"></label>
+        <label class="isian"><span>RT</span><input name="rt" inputmode="numeric" enterkeyhint="next" maxlength="3" placeholder="001" value="${x && x.rt ? String(x.rt).padStart(3, '0') : ''}"></label>
+        <label class="isian"><span>RW</span><input name="rw" inputmode="numeric" enterkeyhint="next" maxlength="3" placeholder="002" value="${x && x.rw ? String(x.rw).padStart(3, '0') : ''}"></label>
         <label class="isian"><span>Dusun</span><input name="dusun" list="daftarDusunIbu" value="${v('dusun')}" autocapitalize="characters"><datalist id="daftarDusunIbu">${dusun.map(z => `<option value="${esc(z)}">`).join('')}</datalist></label>
       </div>
       ${admin() ? `<label class="isian"><span>Posyandu *</span><select name="posyandu" required>${S.d.posyandu.map(p => `<option ${(x ? x.posyandu : S.pos) === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>` : ''}
       <label class="isian"><span>No HP</span><input name="hp" type="tel" inputmode="tel" maxlength="16" placeholder="Contoh: 081234567890" value="${v('hp')}"></label>
       <div class="grid2">
-        <label class="isian"><span>Tinggi badan</span><div class="isian-angka"><input name="tb" inputmode="decimal" value="${x && x.tb ? esc(angka(x.tb)) : ''}" placeholder="0,0"><em>cm</em></div></label>
-        <label class="isian"><span>BB sebelum hamil</span><div class="isian-angka"><input name="bbPra" inputmode="decimal" value="${x && x.bbPra ? esc(angka(x.bbPra)) : ''}" placeholder="–"><em>kg</em></div></label>
+        <label class="isian"><span>Tinggi badan</span><div class="isian-angka"><input name="tb" inputmode="decimal" enterkeyhint="next" value="${x && x.tb ? esc(angka(x.tb)) : ''}" placeholder="0,0"><em>cm</em></div></label>
+        <label class="isian"><span>BB sebelum hamil</span><div class="isian-angka"><input name="bbPra" inputmode="decimal" enterkeyhint="next" value="${x && x.bbPra ? esc(angka(x.bbPra)) : ''}" placeholder="–"><em>kg</em></div></label>
         <label class="isian"><span>Punya buku KIA</span>${yt('bukuKIA', x ? x.bukuKIA : '')}</label>
         <label class="isian"><span>Stiker P4K terpasang</span>${yt('p4k', x ? x.p4k : '')}</label>
       </div>
@@ -1956,8 +1956,8 @@ function formPersalinan(id) {
       <label class="isian"><span>Nama bayi (boleh dikosongkan)</span><input name="namaBayi" maxlength="60" autocapitalize="characters" placeholder="BAYI NY ${esc(x.nama)}"></label>
       <div class="grid3">
         <label class="isian"><span>JK</span><select name="jkBayi"><option value="">–</option><option value="L">L</option><option value="P">P</option></select></label>
-        <label class="isian"><span>BB lahir (g)</span><input name="bbLahir" inputmode="decimal" placeholder="3200"></label>
-        <label class="isian"><span>PB (cm)</span><input name="pbLahir" inputmode="decimal" placeholder="49"></label>
+        <label class="isian"><span>BB lahir (g)</span><input name="bbLahir" inputmode="decimal" enterkeyhint="next" placeholder="3200"></label>
+        <label class="isian"><span>PB (cm)</span><input name="pbLahir" inputmode="decimal" enterkeyhint="next" placeholder="49"></label>
       </div>
       <div id="galatSalin"></div>
       <button class="tombol penuh" type="submit">Simpan persalinan</button>
@@ -2080,8 +2080,8 @@ function formNifas(id, periode) {
       <label class="isian"><span>Tanggal kunjungan</span><input type="date" name="tgl" value="${tglDef}" min="${minTgl}" max="${maxTgl}" required ${dis}></label>
       <div class="isian"><span style="color:var(--merah)">Tanda bahaya nifas (centang bila ada)</span>${chips('bahaya', TANDA_BAHAYA_NIFAS, u ? u.bahaya : '', true)}</div>
       <div class="grid2">
-        <label class="isian"><span>Sistol</span><div class="isian-angka"><input name="sistol" inputmode="numeric" value="${u && +u.sistol ? u.sistol : ''}" placeholder="110" ${dis}><em>mmHg</em></div></label>
-        <label class="isian"><span>Diastol</span><div class="isian-angka"><input name="diastol" inputmode="numeric" value="${u && +u.diastol ? u.diastol : ''}" placeholder="70" ${dis}><em>mmHg</em></div></label>
+        <label class="isian"><span>Sistol</span><div class="isian-angka"><input name="sistol" inputmode="numeric" enterkeyhint="next" value="${u && +u.sistol ? u.sistol : ''}" placeholder="110" ${dis}><em>mmHg</em></div></label>
+        <label class="isian"><span>Diastol</span><div class="isian-angka"><input name="diastol" inputmode="numeric" enterkeyhint="next" value="${u && +u.diastol ? u.diastol : ''}" placeholder="70" ${dis}><em>mmHg</em></div></label>
       </div>
       <div class="judul-sub" style="margin-top:4px">Menyusui</div>
       <label class="isian"><span>Bayi bulan ini diberi (usia ${usiaTeks(usiaBayi)})</span><select name="asi" ${dis}><option value="">–</option>${STATUS_ASI.map(t => `<option ${u && u.asi === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
@@ -2254,6 +2254,7 @@ function viewMenu() {
     </div>` : ''}
     <div class="judul-sub">Akun & aplikasi</div>
     <div class="daftar">
+      ${item('', 'Mode luar ruangan: ' + (document.documentElement.classList.contains('luar') ? 'AKTIF' : 'mati'), 'Teks lebih besar & kontras tinggi untuk di bawah matahari', 'modeLuar', 'segar', 'oranye')}
       ${item('akun', 'Ganti PIN', '', '', 'gembok', 'abu')}
       ${item('', 'Periksa pembaruan', 'Versi ' + esc(C.VERSI) + ' · muat versi terbaru', 'cekPembaruan', 'segar')}
       ${S.pasang ? item('', 'Pasang aplikasi di layar HP', '', 'pasang', 'awan') : ''}
@@ -2306,21 +2307,21 @@ function viewFormBalita(id) {
         <label class="isian"><span>Jenis kelamin *</span><select name="jk" required><option value="">Pilih…</option><option value="L" ${b && b.jk === 'L' ? 'selected' : ''}>Laki-laki</option><option value="P" ${b && b.jk === 'P' ? 'selected' : ''}>Perempuan</option></select></label>
         <label class="isian"><span>Tanggal lahir *</span><input type="date" name="tglLahir" value="${v('tglLahir')}" max="${hariIni()}" required></label>
       </div>
-      <label class="isian"><span>NIK (16 angka)</span><input name="nik" inputmode="numeric" maxlength="16" placeholder="${b && b.nik ? esc(b.nik) + ' — isi untuk mengganti' : 'Kosongkan jika belum punya'}" value="${admin() ? v('nik') : ''}"></label>
-      <label class="isian"><span>No KK (16 angka)</span><input name="kk" inputmode="numeric" maxlength="16" placeholder="${b && b.kk ? esc(b.kk) + ' — isi untuk mengganti' : ''}" value="${admin() ? v('kk') : ''}"></label>
+      <label class="isian"><span>NIK (16 angka)</span><input name="nik" inputmode="numeric" enterkeyhint="next" maxlength="16" placeholder="${b && b.nik ? esc(b.nik) + ' — isi untuk mengganti' : 'Kosongkan jika belum punya'}" value="${admin() ? v('nik') : ''}"></label>
+      <label class="isian"><span>No KK (16 angka)</span><input name="kk" inputmode="numeric" enterkeyhint="next" maxlength="16" placeholder="${b && b.kk ? esc(b.kk) + ' — isi untuk mengganti' : ''}" value="${admin() ? v('kk') : ''}"></label>
       <div class="grid2">
         <label class="isian"><span>Nama ayah</span><input name="ayah" value="${v('ayah')}" autocapitalize="characters" maxlength="60"></label>
         <label class="isian"><span>Nama ibu</span><input name="ibu" value="${v('ibu')}" autocapitalize="characters" maxlength="60"></label>
       </div>
       <div class="grid3">
-        <label class="isian"><span>RT</span><input name="rt" inputmode="numeric" maxlength="3" placeholder="001" value="${b && b.rt ? String(b.rt).padStart(3, '0') : ''}"></label>
-        <label class="isian"><span>RW</span><input name="rw" inputmode="numeric" maxlength="3" placeholder="002" value="${b && b.rw ? String(b.rw).padStart(3, '0') : ''}"></label>
+        <label class="isian"><span>RT</span><input name="rt" inputmode="numeric" enterkeyhint="next" maxlength="3" placeholder="001" value="${b && b.rt ? String(b.rt).padStart(3, '0') : ''}"></label>
+        <label class="isian"><span>RW</span><input name="rw" inputmode="numeric" enterkeyhint="next" maxlength="3" placeholder="002" value="${b && b.rw ? String(b.rw).padStart(3, '0') : ''}"></label>
         <label class="isian"><span>Prematur</span><select name="prematur"><option value="T">Tidak</option><option value="Y" ${b && b.prematur === 'Y' ? 'selected' : ''}>Ya</option></select></label>
       </div>
       ${admin() ? `<label class="isian"><span>Posyandu *</span><select name="posyandu" required>${S.d.posyandu.map(p => `<option ${(b ? b.posyandu : S.pos) === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>` : ''}
       <div class="grid2">
-        <label class="isian"><span>Berat lahir (gram)</span><input name="bbLahir" inputmode="decimal" placeholder="Contoh: 3200" value="${v('bbLahir')}"></label>
-        <label class="isian"><span>Panjang lahir (cm)</span><input name="pbLahir" inputmode="decimal" placeholder="Contoh: 49,5" value="${b ? esc(angka(b.pbLahir).replace('–', '')) : ''}"></label>
+        <label class="isian"><span>Berat lahir (gram)</span><input name="bbLahir" inputmode="decimal" enterkeyhint="next" placeholder="Contoh: 3200" value="${v('bbLahir')}"></label>
+        <label class="isian"><span>Panjang lahir (cm)</span><input name="pbLahir" inputmode="decimal" enterkeyhint="next" placeholder="Contoh: 49,5" value="${b ? esc(angka(b.pbLahir).replace('–', '')) : ''}"></label>
       </div>
       <label class="isian"><span>No HP orang tua</span><input name="hp" type="tel" inputmode="tel" maxlength="16" placeholder="Contoh: 081234567890" value="${v('hp')}"></label>
       <label class="isian"><span>Catatan</span><input name="catatan" maxlength="200" value="${v('catatan')}"></label>
@@ -2598,7 +2599,7 @@ function formUser(i) {
         <label class="isian"><span>Posyandu</span><select name="posyandu"><option value="">–</option>${S.d.posyandu.map(p => `<option ${u && u.posyandu === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>
       </div>
       <div class="grid2">
-        <label class="isian"><span>${u ? 'PIN baru (opsional)' : 'PIN (4–8 angka)'}</span><input name="pinBaru" inputmode="numeric" maxlength="8" ${u ? '' : 'required'}></label>
+        <label class="isian"><span>${u ? 'PIN baru (opsional)' : 'PIN (4–8 angka)'}</span><input name="pinBaru" inputmode="numeric" enterkeyhint="next" maxlength="8" ${u ? '' : 'required'}></label>
         <label class="isian"><span>Status</span><select name="aktif"><option value="Y">Aktif</option><option value="T" ${u && String(u.aktif).toUpperCase() === 'T' ? 'selected' : ''}>Nonaktif</option></select></label>
       </div>
       <div id="galatU"></div>
@@ -2616,9 +2617,9 @@ function viewKunci() {
 
 function viewAkun() {
   return { judul: 'Ganti PIN', nav: 'menu', html: `<form id="fPin" class="kartu">
-    <label class="isian"><span>PIN lama</span><input name="pinLama" type="password" inputmode="numeric" required></label>
-    <label class="isian"><span>PIN baru (4–8 angka)</span><input name="pinBaru" type="password" inputmode="numeric" maxlength="8" required></label>
-    <label class="isian"><span>Ulangi PIN baru</span><input name="pinBaru2" type="password" inputmode="numeric" maxlength="8" required></label>
+    <label class="isian"><span>PIN lama</span><input name="pinLama" type="password" inputmode="numeric" enterkeyhint="next" required></label>
+    <label class="isian"><span>PIN baru (4–8 angka)</span><input name="pinBaru" type="password" inputmode="numeric" enterkeyhint="next" maxlength="8" required></label>
+    <label class="isian"><span>Ulangi PIN baru</span><input name="pinBaru2" type="password" inputmode="numeric" enterkeyhint="next" maxlength="8" required></label>
     <div id="galatPin"></div><button class="tombol penuh" type="submit">Simpan PIN</button><p class="redup kecil">Perlu sinyal.</p></form>` };
 }
 
@@ -2660,6 +2661,11 @@ const AKSI = {
   semuaVaksin: () => { S.semuaVaksin = !S.semuaVaksin; render(); },
   keVitA: () => { S.tabImun = 'Vitamin A'; location.hash = '#/imunisasi'; },
   lompat: el => { const t = document.getElementById('b-' + el.dataset.ke); if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' }); },
+  modeLuar: () => {
+    const on = document.documentElement.classList.toggle('luar');
+    try { localStorage.setItem('tampilan', on ? 'luar' : ''); } catch (e) {}
+    toast(on ? 'Mode luar ruangan aktif.' : 'Mode luar ruangan dimatikan.'); render();
+  },
   keHPL: () => { S.filterIbu = 'hpl'; location.hash = '#/bumil'; },
   periodeIbu: el => { S.periodeIbu = el.dataset.p; render(); },
   filterIbu: el => { S.filterIbu = el.dataset.f; render(); },
@@ -3011,6 +3017,15 @@ if ('serviceWorker' in navigator) {
   let muatUlang = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (!muatUlang) { muatUlang = true; location.reload(); } });
 }
+
+/* Isian cepat: Enter pada isian pindah ke isian berikutnya (tidak langsung menyimpan) */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || !e.target.form || e.target.tagName !== 'INPUT' || /checkbox|submit|date/.test(e.target.type)) return;
+  const isian = Array.from(e.target.form.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([disabled]), select:not([disabled])'));
+  const i = isian.indexOf(e.target);
+  if (i >= 0 && i < isian.length - 1) { e.preventDefault(); isian[i + 1].focus(); }
+});
+try { if (localStorage.getItem('tampilan') === 'luar') document.documentElement.classList.add('luar'); } catch (e) {}
 
 (async function mulai() {
   try {
