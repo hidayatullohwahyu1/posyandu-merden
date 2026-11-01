@@ -305,3 +305,9 @@ nav.bawah button.tengah.aktif { color: var(--utama); }
 /* lompat ke bagian profil */
 .lompat { position: sticky; top: calc(var(--top-h) + env(safe-area-inset-top)); z-index: 5; background: var(--latar); margin: -16px -14px 12px; padding: 10px 14px 6px; }
 .lompat .chips { margin-bottom: 0; }
+/* kartu ibu hamil: aksen merah muda */
+.hero-kartu.ibu .persen { background: var(--merahmuda-bg); color: var(--merahmuda); }
+.hero-kartu.ibu .progres i { background: linear-gradient(90deg, #ff74a8, #d3306f); }
+.hero-kartu.ibu .label-kecil::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--merahmuda); margin-right: 6px; vertical-align: 1px; }
+/* pilihan centang (label.chip) boleh dua baris agar teks panjang tidak terpotong */
+.chips label.chip { white-space: normal; max-width: 100%; border-radius: 14px; height: auto; min-height: 40px; line-height: 1.3; padding-top: 8px; padding-bottom: 8px; text-align: left; }

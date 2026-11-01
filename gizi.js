@@ -348,11 +348,64 @@ function validasiLansia(d) {
   return '';
 }
 
+/* ---------- Ibu hamil (buku KIA, pedoman ANC Kemenkes) ----------
+   HPL = HPHT + 280 hari. Trimester: I s.d. 13 minggu, II 14–27, III >= 28.
+   Risiko 4T: usia < 20 atau > 35 th, jarak persalinan < 2 th, sudah melahirkan >= 4 kali; TB < 145 cm.
+   KEK: LiLA < 23,5 cm. Tekanan darah >= 140/90 = hipertensi kehamilan (waspada preeklamsia), >= 160/110 berat.
+   Anemia: Hb < 11 g/dL; < 7 berat. ANC minimal 6 kali: TM I 1x, TM II 2x, TM III 3x. TTD 1 tablet/hari, minimal 90 tablet. */
+var TANDA_BAHAYA_HAMIL = ['Perdarahan dari jalan lahir', 'Bengkak kaki/tangan/wajah dengan sakit kepala atau pandangan kabur', 'Demam tinggi',
+  'Keluar air ketuban sebelum waktunya', 'Gerakan janin berkurang atau tidak terasa', 'Muntah terus dan tidak mau makan', 'Kejang'];
+var EDUKASI_BUMIL = ['Tanda bahaya kehamilan', 'Gizi ibu hamil', 'Minum TTD', 'Persiapan persalinan (P4K)', 'ASI eksklusif & IMD', 'KB pasca salin'];
+function hplDari(hpht) { return hpht ? tglIso(tglKeMs(hpht) + 280 * 864e5) : ''; }
+function usiaKehamilan(hpht, tgl) { if (!hpht || !tgl) return null; var h = Math.floor((tglKeMs(tgl) - tglKeMs(hpht)) / 864e5); return h < 0 ? null : Math.floor(h / 7); }
+function trimester(minggu) { return minggu === null || minggu === undefined ? '' : minggu <= 13 ? 'I' : minggu <= 27 ? 'II' : 'III'; }
+/* p = {tglLahir, tgl (acuan), para, tglPersalinanAkhir, tb} */
+function risikoIbu(p) {
+  var r = [], usia = p.tglLahir ? Math.floor(usiaBulan(p.tglLahir, p.tgl) / 12) : null;
+  if (usia !== null && usia < 20) r.push('Terlalu muda (< 20 th)');
+  if (usia !== null && usia > 35) r.push('Terlalu tua (> 35 th)');
+  if (p.tglPersalinanAkhir && usiaBulan(p.tglPersalinanAkhir, p.tgl) < 24) r.push('Terlalu dekat (jarak < 2 th)');
+  if (+p.para >= 4) r.push('Terlalu banyak (>= 4 anak)');
+  if (+p.tb > 0 && +p.tb < 145) r.push('Tinggi badan < 145 cm');
+  return r;
+}
+/* d = {lila, sistol, diastol, hb, bahaya: 'a, b', ttd: 'Rutin'|'Tidak teratur'|'Tidak minum'|'', bbLalu, bb} */
+function hitungBumil(d) {
+  var merah = [], kuning = [], s = +d.sistol || 0, di = +d.diastol || 0, hb = +d.hb || 0, lila = +d.lila || 0;
+  var stLILA = lila > 0 ? (lila < 23.5 ? 'KEK' : 'Normal') : '';
+  var stTD = s > 0 && di > 0 ? (s >= 160 || di >= 110 ? 'Hipertensi berat' : s >= 140 || di >= 90 ? 'Hipertensi' : 'Normal') : '';
+  var stHb = hb > 0 ? (hb < 7 ? 'Anemia berat' : hb < 11 ? 'Anemia' : 'Normal') : '';
+  var bahaya = String(d.bahaya || '').split(', ').filter(Boolean);
+  if (bahaya.length) merah.push('Tanda bahaya: ' + bahaya.join(', ').toLowerCase() + ' — rujuk segera');
+  if (stTD === 'Hipertensi berat') merah.push('Tekanan darah sangat tinggi (' + s + '/' + di + ') — rujuk segera');
+  else if (stTD === 'Hipertensi') merah.push('Tekanan darah tinggi (' + s + '/' + di + ') — waspada preeklamsia, rujuk');
+  if (stHb === 'Anemia berat') merah.push('Anemia berat (Hb ' + String(hb).replace('.', ',') + ')');
+  else if (stHb === 'Anemia') kuning.push('Anemia (Hb ' + String(hb).replace('.', ',') + ')');
+  if (stLILA === 'KEK') kuning.push('Kurang energi kronis (LiLA ' + String(lila).replace('.', ',') + ' cm)');
+  if (d.ttd === 'Tidak teratur' || d.ttd === 'Tidak minum') kuning.push('TTD ' + d.ttd.toLowerCase());
+  if (+d.bb > 0 && +d.bbLalu > 0 && +d.bb < +d.bbLalu) kuning.push('Berat badan turun dari kunjungan lalu');
+  return { stLILA: stLILA, stTD: stTD, stHb: stHb, label: merah.length ? 'Merah' : kuning.length ? 'Kuning' : 'Hijau', alasan: merah.concat(kuning) };
+}
+function validasiBumil(d) {
+  if (!d.tgl || isNaN(tglKeMs(d.tgl))) return 'Tanggal kunjungan wajib diisi.';
+  if (periodeDari(d.tgl) !== d.periode) return 'Tanggal kunjungan harus di dalam periode ' + namaPeriode(d.periode) + '.';
+  if (+d.bb && (+d.bb < 30 || +d.bb > 150)) return 'Berat badan harus 30 sampai 150 kg.';
+  if (+d.lila && (+d.lila < 15 || +d.lila > 50)) return 'LiLA harus 15 sampai 50 cm.';
+  if ((+d.sistol > 0) !== (+d.diastol > 0)) return 'Isi tekanan darah lengkap: sistol dan diastol.';
+  if (+d.sistol && (+d.sistol < 60 || +d.sistol > 260)) return 'Sistol harus 60 sampai 260 mmHg.';
+  if (+d.diastol && (+d.diastol < 30 || +d.diastol > 160)) return 'Diastol harus 30 sampai 160 mmHg.';
+  if (+d.sistol && +d.sistol <= +d.diastol) return 'Sistol (angka atas) harus lebih besar dari diastol (angka bawah).';
+  if (+d.hb && (+d.hb < 3 || +d.hb > 20)) return 'Hb harus 3 sampai 20 g/dL.';
+  if (+d.ttdJumlah && (+d.ttdJumlah < 0 || +d.ttdJumlah > 62)) return 'Jumlah TTD diminum harus 0 sampai 62 tablet.';
+  return '';
+}
+
 /* Agar bisa dipakai di Node (uji) tanpa mengganggu Apps Script/browser */
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { hitungGizi: hitungGizi, hitungNT: hitungNT, hitungLabel: hitungLabel, skorRisiko: skorRisiko,
     validasiUkur: validasiUkur, peringatanUkur: peringatanUkur, statusImunisasi: statusImunisasi,
     periodeVitA: periodeVitA, geserPeriode: geserPeriode, akhirPeriode: akhirPeriode, usiaBulan: usiaBulan,
     usiaKPSP: usiaKPSP, hasilKPSP: hasilKPSP, hitungLansia: hitungLansia, validasiLansia: validasiLansia,
-    hitungSkrining: hitungSkrining, validasiSkrining: validasiSkrining };
+    hitungSkrining: hitungSkrining, validasiSkrining: validasiSkrining, hitungBumil: hitungBumil, risikoIbu: risikoIbu,
+    hplDari: hplDari, usiaKehamilan: usiaKehamilan, trimester: trimester };
 }
