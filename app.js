@@ -1138,6 +1138,23 @@ function grafikKMS(b, ind) {
 }
 
 /* ---------- Form imunisasi, vitamin, tindak lanjut, mutasi ---------- */
+/* Peringatan pencatatan imunisasi: terlalu dini menurut jadwal, dosis sebelumnya belum ada/sesudahnya, jarak < 4 minggu */
+function cekUrutanImun(b, kode, tgl) {
+  const j = S.d.jadwal.find(x => x.kode === kode), w = [], diberi = S.d.imun[b.id] || {};
+  if (!j) return w;
+  const usia = usiaBulan(b.tglLahir, tgl);
+  if (usia < j.min) w.push(`${j.nama} dijadwalkan mulai usia ${j.min} bulan, sedangkan anak baru ${usiaTeks(usia)} pada tanggal itu.`);
+  const m = /^([A-Z]+)(\d)$/.exec(kode);
+  if (m && +m[2] > 1) {
+    const kodeLalu = m[1] + (+m[2] - 1), lalu = diberi[kodeLalu];
+    if (S.d.jadwal.some(x => x.kode === kodeLalu)) {
+      if (!lalu) w.push(`Dosis sebelumnya (${kodeLalu}) belum tercatat.`);
+      else if (lalu.tgl >= tgl) w.push(`Tanggal ini tidak sesudah ${kodeLalu} (${fmtTgl(lalu.tgl)}).`);
+      else if ((tglKeMs(tgl) - tglKeMs(lalu.tgl)) / 864e5 < 28) w.push(`Jarak dari ${kodeLalu} (${fmtTgl(lalu.tgl)}) kurang dari 4 minggu.`);
+    }
+  }
+  return w;
+}
 function formImun(id, kode) {
   const b = S.d.byId[id], j = S.d.jadwal.find(x => x.kode === kode), ada = (S.d.imun[id] || {})[kode];
   bukaLembar(`<h3>${esc(j ? j.nama : kode)}</h3><div class="redup kecil" style="margin-bottom:12px">${esc(b.nama)} · jadwal usia ${usiaJadwal(kode)}</div>
@@ -1150,10 +1167,11 @@ function formImun(id, kode) {
 }
 
 function formVit(id) {
-  const b = S.d.byId[id], usia = usiaBulan(b.tglLahir, hariIni()), def = jenisVitA(usia) || 'Obat_Cacing';
+  const b = S.d.byId[id], usia = usiaBulan(b.tglLahir, hariIni()), def = jenisVitA(usia) || (usia >= 12 ? 'Obat_Cacing' : '');
   bukaLembar(`<h3>Vitamin A / obat cacing</h3><div class="redup kecil" style="margin-bottom:12px">${esc(b.nama)} · ${usiaTeks(usia)}</div>
     <form id="fVit" data-id="${esc(id)}">
-      <label class="isian"><span>Jenis</span><select name="jenis">
+      ${usia < 6 ? '<div class="pesan-awas" style="margin-bottom:10px">Belum waktunya: vitamin A mulai usia 6 bulan, obat cacing mulai 12 bulan.</div>' : ''}
+      <label class="isian"><span>Jenis</span><select name="jenis" required><option value="">– Pilih –</option>
         <option value="VitA_Biru" ${def === 'VitA_Biru' ? 'selected' : ''}>Vitamin A biru (6–11 bulan)</option>
         <option value="VitA_Merah" ${def === 'VitA_Merah' ? 'selected' : ''}>Vitamin A merah (12–59 bulan)</option>
         <option value="Obat_Cacing" ${def === 'Obat_Cacing' ? 'selected' : ''}>Obat cacing</option></select></label>
@@ -2826,6 +2844,8 @@ const KIRIM = {
   fImun: async f => {
     const b = S.d.byId[f.dataset.id];
     if (f.tgl.value < b.tglLahir || f.tgl.value > hariIni()) { toast('Tanggal tidak valid.'); return; }
+    const w = cekUrutanImun(b, f.dataset.k, f.tgl.value);
+    if (w.length && !await konfirmasi('Periksa jadwal imunisasi', w.map(esc).join('<br>') + '<br><br>Tetap catat sesuai buku KIA?', 'Tetap catat')) return;
     await antrekan('simpanImunisasi', { id: f.dataset.id, kode: f.dataset.k, tgl: f.tgl.value, tempat: f.tempat.value }, 'Imunisasi ' + f.dataset.k + ' ' + b.nama);
     tutupLembar(); render(); toast('Imunisasi tercatat.');
   },
@@ -2833,6 +2853,7 @@ const KIRIM = {
     const b = S.d.byId[f.dataset.id];
     if (!f.tgl.value || f.tgl.value < b.tglLahir || f.tgl.value > hariIni()) { toast('Tanggal tidak valid.'); return; }
     const usia = usiaBulan(b.tglLahir, f.tgl.value), j = f.jenis.value;
+    if (!j) { toast('Pilih jenis vitamin A atau obat cacing.'); return; }
     const cocok = j === 'Obat_Cacing' ? usia >= 12 : j === jenisVitA(usia);
     const anjuran = { VitA_Biru: 'kapsul biru untuk 6–11 bulan', VitA_Merah: 'kapsul merah untuk 12–59 bulan', Obat_Cacing: 'obat cacing mulai usia 12 bulan' }[j];
     if (!cocok && !await konfirmasi('Periksa jenis dan usia', `Anak berusia ${usiaTeks(usia)} pada tanggal pemberian, sedangkan anjurannya ${anjuran}. Tetap simpan?`, 'Tetap simpan')) return;
@@ -2869,7 +2890,8 @@ const KIRIM = {
     const l = S.d.lansiaById[f.dataset.id];
     const x = { id: l.id, tgl: f.tgl.value, aks: f.aks.value, gds: f.gds.value, amt: f.amt.value, catatan: rapiSpasi(f.catatan.value) };
     RANAH_SKILAS.forEach(r => { x[r.kode] = f[r.kode].value; });
-    const err = validasiSkrining(x) || (x.tgl > hariIni() ? 'Tanggal skrining tidak valid.' : '');
+    const err = validasiSkrining(x) || (x.tgl > hariIni() || x.tgl < l.tglLahir ? 'Tanggal skrining tidak valid.' : '')
+      || (!admin() && x.tgl.slice(0, 7) < geserPeriode(periodeKini(), -1) ? 'Kader hanya bisa mencatat bulan ini dan bulan lalu. Hubungi admin.' : '');
     if (err) { $('#galatSkL').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
     ['aks', 'gds', 'amt'].forEach(k => { x[k] = x[k] === '' ? '' : +x[k]; });
     await antrekan('simpanSkriningLansia', x, 'Skrining lansia ' + l.nama);
