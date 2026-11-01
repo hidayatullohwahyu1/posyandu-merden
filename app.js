@@ -2552,9 +2552,13 @@ function viewLaporan() {
   const ps = []; for (let i = 0; i < 24; i++) ps.push(geserPeriode(periodeKini(), -i));
   const v = perluSinyal('Laporan Excel', 'menu');
   v.html = `<div class="kartu"><h2>Buat laporan bulanan</h2>
-    <label class="isian"><span>Periode</span><select id="perLap">${ps.map((p, i) => `<option value="${p}" ${i === 1 ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>
+    <div class="grid2">
+      <label class="isian"><span>Periode</span><select id="perLap">${ps.map((p, i) => `<option value="${p}" ${i === 1 ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>
+      <label class="isian"><span>Kelompok sasaran</span><select id="kelLap"><option value="balita">Balita</option><option value="ibu">Ibu hamil, nifas &amp; menyusui</option><option value="lansia">Lansia</option><option value="">Semua (3 file)</option></select></label>
+    </div>
     <button class="tombol penuh" data-aksi="buatLaporan">Buat laporan</button>
-    <p class="redup kecil">Laporan otomatis juga dibuat robot setiap tanggal 1 dan dikirim ke email admin. Pembuatan bisa memakan waktu sampai 1 menit.</p>
+    <p class="redup kecil">Balita: rekap SKDN, gizi, imunisasi, vitamin A, obat cacing, MP-ASI, KPSP, PD3I. Ibu: ibu hamil, persalinan, nifas, KB, ASI. Lansia: pemeriksaan, skrining, rujukan.
+      Robot membuat ketiganya setiap tanggal 1 dan mengirim tautannya ke email admin. Pembuatan bisa memakan waktu 1–3 menit.</p>
     <div id="hasilLap"></div></div>
     <div class="kartu"><h2>File impor ePPGBM</h2>
     <p class="redup kecil" style="margin-top:0">Data pengukuran dalam format "Format Import Data Pengukuran Balita" ePPGBM. Hanya balita yang sudah ditimbang dan punya NIK 16 angka.</p>
@@ -2768,10 +2772,11 @@ const AKSI = {
   buatLaporan: async el => {
     const p = $('#perLap').value, h = $('#hasilLap');
     el.disabled = true; el.innerHTML = '<span class="spinner"></span> Membuat laporan…';
-    const r = await api('buatLaporan', { periode: p }, { batas: 300000 });
+    const r = await api('buatLaporan', { periode: p, kelompok: $('#kelLap').value }, { batas: 300000 });
     el.disabled = false; el.textContent = 'Buat laporan';
-    h.innerHTML = r.ok ? `<div class="pesan-info" style="margin-top:12px">Laporan ${esc(r.data.nama)} siap.</div><div class="deret-tombol">
-      <a class="tombol" href="${esc(r.data.unduh)}" target="_blank" rel="noopener">Unduh Excel</a><a class="tombol garis" href="${esc(r.data.url)}" target="_blank" rel="noopener">Buka di Drive</a></div>`
+    const file = r.ok ? (r.data.file || [{ kelompok: 'Balita', nama: r.data.nama, url: r.data.url, unduh: r.data.unduh }]) : [];
+    h.innerHTML = r.ok ? file.map(f => `<div class="pesan-info" style="margin-top:12px"><b>${esc(f.kelompok)}</b> — ${esc(f.nama)} siap.</div><div class="deret-tombol">
+      <a class="tombol" href="${esc(f.unduh)}" target="_blank" rel="noopener">Unduh Excel</a><a class="tombol garis" href="${esc(f.url)}" target="_blank" rel="noopener">Buka di Drive</a></div>`).join('')
       : `<div class="pesan-galat" style="margin-top:12px">${esc(r.pesan)}</div>`;
   },
   unduhEppgbm: async el => {
