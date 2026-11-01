@@ -327,6 +327,9 @@ function validasiSkrining(d) {
   if (!cek(d.amt, 10)) return 'Skor AMT harus 0 sampai 10.';
   return '';
 }
+/* Topik edukasi gizi balita yang dicatat saat penimbangan (fokus MP-ASI kaya protein hewani). */
+var EDUKASI_BALITA = ['ASI eksklusif', 'MP-ASI protein hewani', 'Tekstur & porsi MP-ASI', 'Pemberian makan responsif', 'Kebersihan makanan'];
+/* Obat cacing: anak 12–59 bulan, dua kali setahun (semester Februari dan Agustus, bersama bulan vitamin A). */
 var PENYULUHAN_LANSIA = ['Aktivitas fisik', 'Gizi seimbang', 'Berhenti merokok', 'Minum obat teratur', 'Cegah jatuh', 'Kesehatan jiwa & sosial', 'Kebersihan diri'];
 function validasiLansia(d) {
   if (!d.tgl || isNaN(tglKeMs(d.tgl))) return 'Tanggal pemeriksaan wajib diisi.';

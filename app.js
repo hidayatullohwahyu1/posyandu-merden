@@ -230,7 +230,7 @@ function hitungLokal(d, b, u) {
   return { id: b.id, periode: u.periode, tglUkur: u.tglUkur, usiaBln: g.usiaBln, bb: +u.bb || '', tb: +u.tb || '', cara: +u.tb ? u.cara : '',
     lila: +u.lila || '', lk: +u.lk || '', zBBU: v(g.zBBU), zTBU: v(g.zTBU), zBBTB: v(g.zBBTB), zLKU: v(g.zLKU),
     stBBU: g.stBBU, stTBU: g.stTBU, stBBTB: g.stBBTB, stLKU: g.stLKU, stLILA: g.stLILA, nt: nt.nt, selisih: v(nt.selisihG),
-    label: lab.label, alasan: lab.alasan.join('; '), tbKoreksi: v(g.tbKoreksi), diubahPada: '', petugas: S.sesi ? S.sesi.user.username : '', _lokal: true };
+    label: lab.label, alasan: lab.alasan.join('; '), tbKoreksi: v(g.tbKoreksi), diubahPada: '', petugas: S.sesi ? S.sesi.user.username : '', edukasi: u.edukasi || '', _lokal: true };
 }
 
 /* Terapkan satu perubahan antrean ke data d (tampilan) */
@@ -241,7 +241,7 @@ function terapkanLokal(d, it) {
       if (!b) return;
       (d.ukur[b.id] = d.ukur[b.id] || {})[x.periode] = hitungLokal(d, b, x);
       { const p2 = geserPeriode(x.periode, 1), r2 = d.ukur[b.id][p2];
-        if (r2) d.ukur[b.id][p2] = Object.assign({}, hitungLokal(d, b, { periode: p2, tglUkur: r2.tglUkur, bb: r2.bb, tb: r2.tb, cara: r2.cara, lila: r2.lila, lk: r2.lk }), { _lokal: r2._lokal }); }
+        if (r2) d.ukur[b.id][p2] = Object.assign({}, hitungLokal(d, b, { periode: p2, tglUkur: r2.tglUkur, bb: r2.bb, tb: r2.tb, cara: r2.cara, lila: r2.lila, lk: r2.lk, edukasi: r2.edukasi }), { _lokal: r2._lokal }); }
       break;
     case 'hapusPengukuran':
       if (d.ukur[x.id]) delete d.ukur[x.id][x.periode];
@@ -545,6 +545,8 @@ function statusImun(b) {
   Object.keys(S.d.imun[b.id] || {}).forEach(k => { diberi[k] = S.d.imun[b.id][k].tgl; });
   return { usia, list: statusImunisasi(usia, S.d.jadwal, diberi), idl: imunisasiDasarLengkap(S.d.jadwal, diberi) };
 }
+/* Obat cacing semester berjalan: sejak Februari/Agustus terakhir s.d. periode P */
+function ocSudah(b, P) { const awal = periodeVitA(P); return (S.d.vit[b.id] || []).some(v => v.jenis === 'Obat_Cacing' && v.periode >= awal && v.periode <= P); }
 function vitASudah(b, perVit) { return (S.d.vit[b.id] || []).some(v => v.periode === perVit && v.jenis.indexOf('VitA') === 0); }
 function tlTerbuka(id) { return S.d.tl.filter(t => t.ID_Balita === id && ['Belum', 'Sedang', 'Membaik'].indexOf(t.Status) >= 0).pop() || null; }
 
@@ -690,9 +692,9 @@ function viewBeranda() {
   const skrTempo = sl.filter(l => skriningTempo(l.id)).length;
   const layananBalita = [
     ['ke', 'imunisasi', 'w-biru', 'suntik', 'Imunisasi'],
-    ['keVitA', '', 'w-oranye', 'kapsul', 'Vitamin A'],
-    ['ke', 'data-balita', 'w-tosca', 'daftar', 'Data balita'],
-    ['ke', 'tambah-balita', 'w-pink', 'bayi', 'Tambah balita']
+    ['keVitA', '', 'w-oranye', 'kapsul', 'Vitamin & cacing'],
+    ['ke', 'materi-mpasi', 'w-hijau', 'buku', 'Edukasi MP-ASI'],
+    ['ke', 'data-balita', 'w-tosca', 'daftar', 'Data balita']
   ];
   const layananLansia = [
     ['ke', 'lansia', 'w-hijau', 'nadi', 'Periksa lansia'],
@@ -846,6 +848,10 @@ function formUkur(id, periode) {
         <label class="isian"><span>Lingkar lengan (LiLA)</span><div class="isian-angka"><input name="lila" inputmode="decimal" enterkeyhint="next" value="${u ? esc(angka(u.lila).replace('–', '')) : ''}" placeholder="${usia < 6 ? '≥ 6 bln' : '0,0'}" ${dis}><em>cm</em></div>${hint('lila', 'cm')}</label>
         <label class="isian"><span>Lingkar kepala</span><div class="isian-angka"><input name="lk" inputmode="decimal" enterkeyhint="done" value="${u ? esc(angka(u.lk).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lk', 'cm')}</label>
       </div>
+      <div class="isian"><span class="redup kecil" style="display:block;margin-bottom:6px;font-weight:550">Edukasi gizi yang diberikan${usia >= 6 && usia <= 23 ? ' (usia MP-ASI)' : ''}</span>
+        <div class="chips" style="flex-wrap:wrap">${EDUKASI_BALITA.map(t => { const on = u && String(u.edukasi || '').split(', ').indexOf(t) >= 0;
+          return `<label class="chip ${on ? 'aktif' : ''}"><input type="checkbox" name="edu" value="${t}" ${on ? 'checked' : ''} ${dis} style="display:none" onchange="this.parentNode.classList.toggle('aktif',this.checked)">${t}</label>`; }).join('')}</div>
+        <a href="#/materi-mpasi" class="kecil">Lihat bahan edukasi MP-ASI kaya protein hewani</a></div>
       <div id="galatUkur"></div>
       ${boleh.ok ? `<button class="tombol penuh" type="submit">${u ? 'Perbarui' : 'Simpan'}</button>
       <div class="deret-tombol" style="margin-top:10px">
@@ -865,6 +871,7 @@ async function simpanUkur(f) {
     if (Number.isNaN(n)) { $('#galatUkur').innerHTML = `<div class="pesan-galat">${nama[k]} harus berupa angka, contoh ${k === 'bb' ? '8,5' : '72,4'}.</div>`; return; }
     x[k] = n === '' ? 0 : n;
   }
+  x.edukasi = Array.from(f.querySelectorAll('input[name=edu]:checked')).map(i => i.value).join(', ');
   const err = validasiUkur(x, b.tglLahir);
   if (err) { $('#galatUkur').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
   if (usiaBulan(b.tglLahir, x.tglUkur) > 60) { $('#galatUkur').innerHTML = `<div class="pesan-galat">Usia sudah lebih dari 60 bulan.</div>`; return; }
@@ -895,6 +902,9 @@ function tampilHasil(b, u) {
       ${u.stLILA ? `<tr><td>LiLA</td><td class="angka-sel">${angka(u.lila)} cm</td><td>${esc(u.stLILA)}</td></tr>` : ''}
       ${u.nt ? `<tr><td>Naik BB</td><td class="angka-sel">${u.selisih !== '' ? angka(u.selisih) + ' g' : ''}</td><td>${{ N: 'Naik', T: 'Tidak naik', O: 'Bulan lalu tidak ditimbang', B: 'Baru pertama ditimbang' }[u.nt] || ''}</td></tr>` : ''}
     </table>
+    ${(() => { const us = usiaBulan(b.tglLahir, u.tglUkur); return us >= 6 && us <= 23 && String(u.edukasi || '').indexOf('MP-ASI') < 0
+      ? `<div class="pesan-info">Usia MP-ASI: sampaikan pentingnya <b>protein hewani setiap hari</b> (telur, ikan, ayam, hati). <a href="#/materi-mpasi">Lihat bahan edukasi</a></div>` : ''; })()}
+    ${u.edukasi ? `<p class="kecil">Edukasi: ${esc(u.edukasi)}</p>` : ''}
     <p class="redup kecil">Status bersifat penanda; penentuan dan penanganan oleh tenaga kesehatan.${u.label === 'Merah' ? ' Sampaikan ke orang tua dan catat rujukan di menu Risiko.' : ''}</p>
     <div class="deret-tombol">
       ${berikut ? `<button class="tombol" data-aksi="formUkur" data-id="${esc(berikut.id)}">Berikutnya: ${esc(berikut.nama.split(' ').slice(0, 2).join(' '))} ${ikon('kanan', 18)}</button>` : ''}
@@ -962,6 +972,7 @@ function viewBalita(id) {
     <div class="kartu" id="b-vitamin"><div class="baris antara"><h2 style="margin:0">Vitamin A &amp; obat cacing</h2><button class="tombol garis kecil" data-aksi="formVit" data-id="${esc(id)}">Catat</button></div>
       ${vit.length ? vit.map(v => `<div class="vaksin"><div class="nm">${{ VitA_Biru: 'Vitamin A biru', VitA_Merah: 'Vitamin A merah', Obat_Cacing: 'Obat cacing' }[v.jenis]}${v._lokal ? ' ⏳' : ''}<small>${fmtTgl(v.tgl)} · periode ${namaPeriode(v.periode)}</small></div>
         <button class="tombol bahaya kecil" data-aksi="hapusVit" data-id="${esc(id)}" data-v="${esc(v.id)}">Hapus</button></div>`).join('') : '<div class="redup" style="margin-top:8px">Belum ada catatan.</div>'}
+      ${si.usia >= 12 && si.usia <= 59 && !ocSudah(b, P) ? `<div class="pesan-awas" style="margin:10px 0 0">Belum menerima obat cacing semester ini (sejak ${namaPeriode(periodeVitA(P))}).</div>` : ''}
       ${si.usia >= 6 && si.usia <= 59 && !vitASudah(b, periodeVitA(P)) ? `<div class="pesan-awas" style="margin:10px 0 0">Belum menerima vitamin A periode ${namaPeriode(periodeVitA(P))}.</div>` : ''}</div>
     <span id="b-kpsp"></span>${kartuKPSP(b)}${kartuPD3I(b)}
     <div class="kartu" id="b-tl"><div class="baris antara"><h2 style="margin:0">Tindak lanjut</h2><button class="tombol garis kecil" data-aksi="formTL" data-id="${esc(id)}">Catat</button></div>
@@ -1512,11 +1523,39 @@ function viewMateriLansia() {
     <p class="redup kecil">Sumber pesan: kampanye CERDIK dan PATUH Kementerian Kesehatan RI.</p>` };
 }
 
+/* ---------- Edukasi MP-ASI kaya protein hewani (Kemenkes / PMBA) ---------- */
+function viewMateriMPASI() {
+  const blok = (judul, l, warna) => `<div class="kartu"${warna ? ` style="border-left:5px solid ${warna}"` : ''}><h2>${judul}</h2>${l.map(x => `<div class="vaksin"><div class="nm"><b>${x[0]}</b>${x[1] ? `<small>${x[1]}</small>` : ''}</div></div>`).join('')}</div>`;
+  return { judul: 'Edukasi MP-ASI', nav: 'menu', html: `
+    <div class="pesan-info">Bahan edukasi singkat untuk ibu/pengasuh balita. Catat edukasi yang disampaikan di form penimbangan (bagian Edukasi gizi).</div>
+    ${blok('Protein hewani setiap hari — cegah stunting', [
+      ['Berikan minimal satu sumber protein hewani setiap kali makan', 'Telur, ikan (lele, kembung, teri, nila), ayam, daging, hati ayam, atau susu.'],
+      ['Pilihan murah dan mudah', 'Satu butir telur sehari, ikan teri, atau hati ayam sudah sangat membantu pertumbuhan.'],
+      ['Protein nabati melengkapi, bukan menggantikan', 'Tahu, tempe, dan kacang-kacangan tetap baik sebagai tambahan.']], 'var(--oke)')}
+    ${blok('Kapan mulai dan sampai kapan', [
+      ['0–6 bulan: ASI saja (ASI eksklusif)', 'Tanpa air, madu, atau makanan lain.'],
+      ['Mulai 6 bulan: MP-ASI', 'Lanjutkan ASI sampai usia 2 tahun atau lebih.']])}
+    ${blok('Tekstur, frekuensi, dan porsi', [
+      ['6–8 bulan', 'Bubur kental/lumat. 2–3 kali makan + 1–2 kali selingan. Mulai 2–3 sendok makan, naik bertahap sampai ½ mangkuk (250 ml).'],
+      ['9–11 bulan', 'Cincang halus atau makanan yang bisa digenggam. 3–4 kali makan + 1–2 kali selingan. ½–¾ mangkuk.'],
+      ['12–23 bulan', 'Makanan keluarga yang dipotong kecil. 3–4 kali makan + 1–2 kali selingan. ¾–1 mangkuk.']])}
+    ${blok('Cara memberi makan', [
+      ['Makan dengan sabar dan penuh perhatian', 'Tanggapi tanda lapar dan kenyang; jangan memaksa; ajak bicara saat makan.'],
+      ['Isi piring lengkap', 'Makanan pokok + protein hewani + sayur/buah + sedikit lemak (minyak, santan) untuk energi.'],
+      ['Batasi gula, garam, dan makanan ringan kemasan', 'Hindari minuman manis sebagai pengganti makan.']])}
+    ${blok('Kebersihan makanan', [
+      ['Cuci tangan pakai sabun', 'Sebelum menyiapkan makanan dan sebelum menyuapi anak.'],
+      ['Masak sampai matang dan segera diberikan', 'Simpan sisa makanan tertutup; jangan berikan makanan yang sudah basi.']])}
+    <p class="redup kecil">Sumber pesan: pedoman Pemberian Makan Bayi dan Anak (PMBA) dan kampanye protein hewani Kementerian Kesehatan RI.</p>` };
+}
+
 /* ---------- Imunisasi ---------- */
 function viewImunisasi() {
   const P = periodeKini(), perVit = periodeVitA(P), sas = sasaran(P);
   let list = [];
-  if (S.tabImun === 'KPSP') list = sas.map(b => ({ b, uk: kpspTempo(b) })).filter(x => x.uk).map(x => ({ b: x.b, ket: 'KPSP ' + x.uk + ' bulan' }));
+  if (S.tabImun === 'Obat cacing') list = sas.filter(b => { const u = usiaBulan(b.tglLahir, hariIni()); return u >= 12 && u <= 59 && !ocSudah(b, P); })
+    .map(b => ({ b, ket: 'Obat cacing semester ' + namaPeriode(perVit) }));
+  else if (S.tabImun === 'KPSP') list = sas.map(b => ({ b, uk: kpspTempo(b) })).filter(x => x.uk).map(x => ({ b: x.b, ket: 'KPSP ' + x.uk + ' bulan' }));
   else if (S.tabImun === 'Vitamin A') list = sas.filter(b => { const u = usiaBulan(b.tglLahir, hariIni()); return u >= 6 && u <= 59 && !vitASudah(b, perVit); })
     .map(b => ({ b, ket: jenisVitA(usiaBulan(b.tglLahir, hariIni())) === 'VitA_Biru' ? 'Kapsul biru' : 'Kapsul merah' }));
   else list = sas.map(b => ({ b, v: statusImun(b).list.filter(x => x.status === S.tabImun) })).filter(x => x.v.length)
@@ -1524,8 +1563,9 @@ function viewImunisasi() {
   list.sort((a, c) => urutNama(a.b, c.b));
   return { judul: 'Imunisasi & Vitamin', html: `
     ${admin() ? pilihPosyandu() : ''}
-    <div class="chips" style="flex-wrap:wrap">${['Jatuh tempo', 'Terlambat', 'Vitamin A', 'KPSP'].map(t => `<button class="chip ${S.tabImun === t ? 'aktif' : ''}" data-aksi="tabImun" data-t="${t}">${t}</button>`).join('')}</div>
+    <div class="chips" style="flex-wrap:wrap">${['Jatuh tempo', 'Terlambat', 'Vitamin A', 'Obat cacing', 'KPSP'].map(t => `<button class="chip ${S.tabImun === t ? 'aktif' : ''}" data-aksi="tabImun" data-t="${t}">${t}</button>`).join('')}</div>
     ${S.tabImun === 'Vitamin A' ? `<div class="pesan-info">Periode vitamin A: ${namaPeriode(perVit)} (Februari dan Agustus). Daftar ini anak 6–59 bulan yang belum tercatat.</div>`
+      : S.tabImun === 'Obat cacing' ? `<div class="pesan-info">Anak 12–59 bulan yang belum menerima obat cacing sejak ${namaPeriode(perVit)} (dua kali setahun, bersama bulan vitamin A).</div>`
       : S.tabImun === 'KPSP' ? '<div class="pesan-info">Anak yang jadwal KPSP (pemeriksaan perkembangan) usianya sudah tercapai tetapi belum dicatat.</div>'
       : S.tabImun === 'Terlambat' ? '<div class="pesan-info">Lewat usia jadwal: perlu imunisasi kejar. Konsultasikan dengan bidan desa.</div>' : ''}
     <div class="baris antara" style="margin:0 4px 8px"><span class="redup kecil">${list.length} balita</span>
@@ -1584,6 +1624,7 @@ function viewMenu() {
     <div class="daftar">
       ${item('data-balita', 'Data balita', 'Daftar, cari, tambah, ubah', '', 'daftar')}
       ${item('tambah-balita', 'Tambah balita', 'Bayi lahir, pindah datang, baru terdata', '', 'bayi')}
+      ${item('materi-mpasi', 'Edukasi MP-ASI', 'Bahan MP-ASI kaya protein hewani', '', 'buku', 'hijau')}
     </div>
     <div class="judul-sub">Lansia</div>
     <div class="daftar">
@@ -1737,6 +1778,13 @@ function viewDashboard() {
         <div class="angka merah"><b>${t.Wasting}</b><span>Wasting</span></div>
         <div class="angka kuning"><b>${t.Underweight}</b><span>Underweight</span></div>
         <div class="angka merah"><b>${t.Merah}</b><span>Label merah</span></div>
+      </div>
+      <div class="judul-sub">Imunisasi, suplemen & edukasi</div>
+      <div class="statistik">
+        <div class="angka"><b>${t.IDL}/${t.Sasaran_IDL}</b><span>Imunisasi dasar lengkap (12–23 bln)</span></div>
+        ${t.Sasaran_VitA ? `<div class="angka"><b>${t.VitA}/${t.Sasaran_VitA}</b><span>Vitamin A bulan ini</span></div>` : ''}
+        <div class="angka"><b>${t.Obat_Cacing || 0}/${t.Sasaran_OC || 0}</b><span>Obat cacing semester ini (12–59 bln)</span></div>
+        <div class="angka"><b>${t.Edukasi_MPASI || 0}/${t.Sasaran_MPASI || 0}</b><span>Edukasi MP-ASI (6–23 bln ditimbang)</span></div>
       </div>
       ${d.lansia ? `<div class="judul-sub">Lansia</div>
       <div class="statistik">
@@ -1938,7 +1986,7 @@ function viewAkun() {
 const VIEWS = {
   beranda: viewBeranda, ukur: viewUkur, imunisasi: viewImunisasi, risiko: viewRisiko, menu: viewMenu, balita: viewBalita, antrean: viewAntrean,
   'data-balita': viewDataBalita, 'tambah-balita': () => viewFormBalita(''), 'ubah-balita': viewFormBalita, dashboard: viewDashboard, pantau: viewPantau, belum: viewBelum,
-  lansia: viewLansia, 'lansia-profil': viewProfilLansia, 'materi-lansia': viewMateriLansia, 'tambah-lansia': () => viewFormLansia(''), 'ubah-lansia': viewFormLansia,
+  lansia: viewLansia, 'lansia-profil': viewProfilLansia, 'materi-lansia': viewMateriLansia, 'materi-mpasi': viewMateriMPASI, 'tambah-lansia': () => viewFormLansia(''), 'ubah-lansia': viewFormLansia,
   persetujuan: viewPersetujuan, laporan: viewLaporan, pengguna: viewPengguna, kunci: viewKunci, akun: viewAkun
 };
 
@@ -2033,7 +2081,7 @@ const AKSI = {
   },
   salinWA: async () => {
     const v = viewImunisasi(), P = periodeKini();
-    const teks = `*${S.tabImun === 'KPSP' ? 'Jadwal KPSP (perkembangan)' : S.tabImun === 'Vitamin A' ? 'Sasaran Vitamin A ' + namaPeriode(periodeVitA(P)) : 'Imunisasi ' + S.tabImun.toLowerCase()}* — ${admin() && !S.pos ? S.d.desa : 'Posyandu ' + (S.pos || S.d.user.posyandu)}\n` +
+    const teks = `*${S.tabImun === 'Obat cacing' ? 'Sasaran obat cacing semester ' + namaPeriode(periodeVitA(P)) : S.tabImun === 'KPSP' ? 'Jadwal KPSP (perkembangan)' : S.tabImun === 'Vitamin A' ? 'Sasaran Vitamin A ' + namaPeriode(periodeVitA(P)) : 'Imunisasi ' + S.tabImun.toLowerCase()}* — ${admin() && !S.pos ? S.d.desa : 'Posyandu ' + (S.pos || S.d.user.posyandu)}\n` +
       v.data.map((x, i) => `${i + 1}. ${x.b.nama} (${rtRw(x.b)}, ibu ${x.b.ibu || '-'}) — ${x.ket}`).join('\n');
     try { await navigator.clipboard.writeText(teks); toast('Daftar disalin. Tempel di WhatsApp.'); }
     catch (e) { bukaLembar(`<h3>Salin teks</h3><textarea style="min-height:240px">${esc(teks)}</textarea>`); }
