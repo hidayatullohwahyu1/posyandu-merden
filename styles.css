@@ -196,6 +196,8 @@ table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 th, td { padding: 10px 8px; border-bottom: 1px solid #eef2f8; text-align: left; white-space: nowrap; }
 th { color: var(--teks-2); font-weight: 700; font-size: .76rem; text-transform: uppercase; letter-spacing: .03em; }
 td.angka-sel, th.angka-sel { text-align: right; font-variant-numeric: tabular-nums; }
+/* Tabel hasil di lembar bawah: kolom status boleh turun baris agar tidak terpotong di layar HP */
+.lembar td:last-child { white-space: normal; }
 tr.bisa-ketuk { cursor: pointer; } tr.bisa-ketuk:active { background: var(--utama-muda); }
 /* tabel lebar digeser ke samping: kolom pertama (nama/bulan) tetap terlihat */
 .tabel-wrap th:first-child, .tabel-wrap td:first-child { position: sticky; left: 0; background: var(--kartu); z-index: 1; }

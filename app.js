@@ -20,6 +20,8 @@ const S = {
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const angka = v => (v === '' || v === null || v === undefined) ? '–' : String(v).replace('.', ',');
+/* z-score selalu dua angka di belakang koma: -0,60 bukan -0,6 */
+const angkaZ = v => (v === '' || v === null || v === undefined || isNaN(+v)) ? '–' : (+v).toFixed(2).replace('.', ',');
 const kosongNull = v => (v === '' || v === undefined) ? null : v;
 function hariIni() { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); }
 const periodeKini = () => hariIni().slice(0, 7);
@@ -1014,7 +1016,7 @@ function tampilHasil(b, u) {
   const p = u.periode;
   const berikut = sasaran(p).filter(z => !ukurDi(z.id, p) && z.id !== b.id).sort(urutNama)
     .find(z => urutNama(z, b) > 0) || sasaran(p).find(z => !ukurDi(z.id, p));
-  const baris = (n, z, st) => st ? `<tr><td>${n}</td><td class="angka-sel">${z === '' || z === null ? '–' : angka(z)}</td><td>${esc(st)}</td></tr>` : '';
+  const baris = (n, z, st) => st ? `<tr><td>${n}</td><td class="angka-sel">${angkaZ(z)}</td><td>${esc(st)}</td></tr>` : '';
   bukaLembar(`
     <h3>${esc(b.nama)}</h3><div class="redup kecil" style="margin-bottom:12px">Tersimpan ${S.online ? '' : '(akan dikirim saat ada sinyal)'} · ${namaPeriode(p)}</div>
     <div class="hasil ${u.label}"><div class="baris antara"><b>${u.label === 'Merah' ? 'Perlu rujukan' : u.label === 'Kuning' ? 'Waspada' : 'Normal'}</b><span class="lbl ${u.label}">${u.label}</span></div>
