@@ -181,6 +181,10 @@ input[disabled], select[disabled] { opacity: .6; }
 .item .isi { flex: 1; min-width: 0; }
 .item .nama { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item .sub { font-size: .87rem; color: var(--teks-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Daftar persetujuan: nama dan keterangan ditampilkan utuh, tombol di bawahnya */
+.item.rinci .isi { flex: 1 1 100%; }
+.item.rinci .nama, .item.rinci .sub { white-space: normal; overflow: visible; }
+.item.rinci .deret-tombol { margin-left: auto; }
 .item .sub.dua { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--teks); }
 .avatar { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; flex: none; font-weight: 800; font-size: .88rem; color: #fff; }
 .avatar.L { background: linear-gradient(135deg, #4c9dff, #1468e5); } .avatar.P { background: linear-gradient(135deg, #ff7eb0, #d3306f); }
@@ -301,6 +305,7 @@ nav.bawah button.tengah.aktif { color: var(--utama); }
 .item .ik-item.abu { background: var(--abu-bg); color: var(--abu); } .item .ik-item.tosca { background: var(--tosca-bg); color: var(--tosca); }
 .profil-akun { display: flex; align-items: center; gap: 12px; }
 /* aksi berbahaya di profil: tautan kecil, bukan tombol besar */
+.tautan-pindah { background: none; border: 0; color: var(--utama); font-weight: 600; font-size: .9rem; padding: 12px 4px 0; min-height: 44px; display: block; margin: 0 auto; }
 .tautan-bahaya { background: none; border: 0; color: var(--merah); font-weight: 600; font-size: .9rem; padding: 12px 4px 0; min-height: 44px; display: block; margin: 0 auto; }
 /* baris keterangan profil: bagian tidak terpecah di tengah (mis. "Lestari 1") */
 .meta span { white-space: nowrap; }

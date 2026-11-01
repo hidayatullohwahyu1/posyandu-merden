@@ -202,7 +202,7 @@ function olahData(raw) {
     tl: raw.tl, usulan: raw.usulan, jadwal: raw.jadwal, kbm: raw.kbm, kunci: raw.kunci, kpsp, pd3i: lay.pd3i.map(pd3iObj),
     lansia: ls.lansia.map(r => ob(ls.kolLansia, r)), kolPeriksaL: ls.kolPeriksa, periksaL, skriningL, kolSkrining: ls.kolSkrining || KOL_SKRINING,
     ibu: ib.ibu.map(r => ob(ib.kolIbu, r)), kolPeriksaIbu: ib.kolPeriksa, periksaIbu, kolIbu: ib.kolIbu.length ? ib.kolIbu : KOL_IBU_C,
-    nifasIbu, kolNifas: ib.kolNifas || KOL_NIFAS
+    nifasIbu, kolNifas: ib.kolNifas || KOL_NIFAS, usulPindah: raw.usulPindah || []
   };
 }
 const KOL_PERIKSA_L = ['id', 'periode', 'tgl', 'bb', 'tb', 'imt', 'stIMT', 'lp', 'stLP', 'sistol', 'diastol', 'stTD', 'obat', 'merokok', 'label', 'alasan', 'diubahPada', 'petugas',
@@ -287,7 +287,7 @@ function terapkanLokal(d, it) {
     case 'usulMutasi':
       if (!b) return;
       if (S.sesi && S.sesi.user.peran === 'admin') {
-        b.status = x.jenis === 'Masuk' ? 'Aktif' : x.alasan === 'Meninggal' ? 'Meninggal' : 'Pindah';
+        b.status = x.jenis === 'Masuk' ? 'Aktif' : x.alasan === 'Meninggal' ? 'Meninggal' : x.alasan === 'Data ganda/salah input' ? 'Ditolak' : 'Pindah';
         b.tglKeluar = x.jenis === 'Masuk' ? '' : x.tanggal;
       } else d.usulan.push({ ID_Balita: b.id, Jenis: x.jenis, Alasan: x.alasan, Tanggal: x.tanggal, Status: 'Diusulkan', _lokal: true });
       break;
@@ -350,7 +350,7 @@ function terapkanLokal(d, it) {
       break; }
     case 'usulKeluarIbu': {
       const i = d.ibuById[x.id]; if (!i) return;
-      if (S.sesi && S.sesi.user.peran === 'admin') { i.status = x.alasan === 'Lainnya' ? 'Selesai' : x.alasan; i.tglKeluar = x.tanggal; }
+      if (S.sesi && S.sesi.user.peran === 'admin') { i.status = x.alasan === 'Lainnya' ? 'Selesai' : x.alasan === 'Data ganda/salah input' ? 'Batal' : x.alasan; i.tglKeluar = x.tanggal; }
       else { i.usulKeluar = x.alasan; i.usulTanggal = x.tanggal; }
       break; }
     case 'simpanSkriningLansia': {
@@ -375,9 +375,14 @@ function terapkanLokal(d, it) {
         d.lansia.push(baru); d.lansiaById[baru.id] = baru;
       }
       break; }
+    case 'usulPindahPosyandu': {
+      const u = { id: 'PDH_' + x.kelompok + '_' + x.id, kelompok: x.kelompok, idSasaran: x.id, ke: x.ke, alasan: x.alasan, status: admin() ? 'Disetujui' : 'Diusulkan', _lokal: true };
+      d.usulPindah = d.usulPindah.filter(z => z.id !== u.id);
+      if (admin()) { const sx = sasaranPindah(d, x.kelompok, x.id); if (sx) sx.posyandu = x.ke; } else d.usulPindah.push(u);
+      break; }
     case 'usulKeluarLansia': {
       const l = d.lansiaById[x.id]; if (!l) return;
-      if (S.sesi && S.sesi.user.peran === 'admin') { l.status = x.alasan === 'Meninggal' ? 'Meninggal' : x.alasan === 'Pindah' ? 'Pindah' : 'Keluar'; l.tglKeluar = x.tanggal; }
+      if (S.sesi && S.sesi.user.peran === 'admin') { l.status = x.alasan === 'Meninggal' ? 'Meninggal' : x.alasan === 'Pindah' ? 'Pindah' : x.alasan === 'Data ganda/salah input' ? 'Batal' : 'Keluar'; l.tglKeluar = x.tanggal; }
       else { l.usulKeluar = x.alasan; l.usulTanggal = x.tanggal; }
       break; }
     case 'simpanKPSP':
@@ -416,6 +421,7 @@ function terimaHasil(it, h) {
   if (!D.nifasIbu) D.nifasIbu = {};
   if (!D.kolNifas) D.kolNifas = KOL_NIFAS;
   if (!D.kolIbu) D.kolIbu = KOL_IBU_C;
+  if (!D.usulPindah) D.usulPindah = [];
   const masihAda = S.antrean.some(o => o !== it && o.kunci && o.kunci === it.kunci && o.status !== 'gagal');
   switch (it.action) {
     case 'simpanPengukuran':
@@ -443,7 +449,7 @@ function terimaHasil(it, h) {
       if (h.hitungUlang) S.perluSinkron = true;   // z-score pengukuran lama dihitung ulang di server: ambil versi barunya
       break; }
     case 'usulMutasi':
-      if (h.status === 'Disetujui') { const b = D.balita.find(z => z.id === x.id); if (b) { b.status = x.jenis === 'Masuk' ? 'Aktif' : x.alasan === 'Meninggal' ? 'Meninggal' : 'Pindah'; b.tglKeluar = x.jenis === 'Masuk' ? '' : x.tanggal; } }
+      if (h.status === 'Disetujui') { const b = D.balita.find(z => z.id === x.id); if (b) { b.status = x.jenis === 'Masuk' ? 'Aktif' : x.alasan === 'Meninggal' ? 'Meninggal' : x.alasan === 'Data ganda/salah input' ? 'Ditolak' : 'Pindah'; b.tglKeluar = x.jenis === 'Masuk' ? '' : x.tanggal; } }
       else D.usulan.push({ ID: h.idMutasi, ID_Balita: x.id, Jenis: x.jenis, Alasan: x.alasan, Tanggal: x.tanggal, Status: 'Diusulkan' });
       break;
     case 'simpanTindakLanjut': tlMasuk(D, h); break;
@@ -477,7 +483,7 @@ function terimaHasil(it, h) {
       break; }
     case 'usulKeluarIbu': {
       const i = D.ibu.find(z => z.id === x.id);
-      if (i && h.status === 'Disetujui') { i.status = x.alasan === 'Lainnya' ? 'Selesai' : x.alasan; i.tglKeluar = x.tanggal; }
+      if (i && h.status === 'Disetujui') { i.status = x.alasan === 'Lainnya' ? 'Selesai' : x.alasan === 'Data ganda/salah input' ? 'Batal' : x.alasan; i.tglKeluar = x.tanggal; }
       else if (i) { i.usulKeluar = x.alasan; i.usulTanggal = x.tanggal; }
       break; }
     case 'simpanSkriningLansia':
@@ -492,9 +498,13 @@ function terimaHasil(it, h) {
       if (x.nik) l.nik = S.sesi.user.peran === 'admin' ? x.nik : x.nik.slice(0, 4) + 'xxxxxxxx' + x.nik.slice(-4);
       if (x.kk) l.kk = S.sesi.user.peran === 'admin' ? x.kk : x.kk.slice(0, 4) + 'xxxxxxxx' + x.kk.slice(-4);
       break; }
+    case 'usulPindahPosyandu': {
+      D.usulPindah = (D.usulPindah || []).filter(z => z.id !== h.id);
+      if (h.status === 'Disetujui') { const sx = sasaranPindah(D, h.kelompok, h.idSasaran); if (sx) sx.posyandu = h.ke; } else D.usulPindah.push(h);
+      break; }
     case 'usulKeluarLansia': {
       const l = D.lansia.find(z => z.id === x.id);
-      if (l && h.status === 'Disetujui') { l.status = x.alasan === 'Meninggal' ? 'Meninggal' : x.alasan === 'Pindah' ? 'Pindah' : 'Keluar'; l.tglKeluar = x.tanggal; }
+      if (l && h.status === 'Disetujui') { l.status = x.alasan === 'Meninggal' ? 'Meninggal' : x.alasan === 'Pindah' ? 'Pindah' : x.alasan === 'Data ganda/salah input' ? 'Batal' : 'Keluar'; l.tglKeluar = x.tanggal; }
       else if (l) { l.usulKeluar = x.alasan; l.usulTanggal = x.tanggal; }
       break; }
     case 'simpanKPSP': if (!masihAda) (D.kpsp[h[0]] = D.kpsp[h[0]] || {})[h[1]] = kpspObj(h); break;
@@ -538,6 +548,7 @@ function kunciAntrean(a, x) {
   if (a === 'simpanSkriningLansia') return 'skl|' + x.id + '|' + x.tgl.slice(0, 7);
   if (a === 'simpanKPSP') return 'kpsp|' + x.id + '|' + x.usiaKpsp;
   if (a === 'laporPD3I') return 'pd3i|' + x.idLapor;
+  if (a === 'usulPindahPosyandu') return 'pdh|' + x.kelompok + '|' + x.id;
   return '';
 }
 
@@ -1067,6 +1078,7 @@ function viewBalita(id) {
         <button class="tombol garis" data-aksi="ke" data-ke="ubah-balita/${esc(id)}">Ubah data</button>
         ${!aktif && admin() ? `<button class="tombol garis" data-aksi="aktifkan" data-id="${esc(id)}">Aktifkan lagi</button>` : ''}
       </div>
+      ${aktif ? tombolPindah('balita', id) : ''}
       ${aktif && !usulan.length ? `<button class="tautan-bahaya" data-aksi="mutasi" data-id="${esc(id)}">Keluarkan dari daftar (pindah/meninggal)</button>` : ''}
     </div>
     ${t ? `<div class="kartu"><div class="baris antara"><h2 style="margin:0">Terakhir: ${namaPeriode(t.periode)}</h2><span class="lbl ${t.label}">${t.label}</span></div>
@@ -1208,13 +1220,38 @@ function formTL(id) {
     </form>`);
 }
 
+/* ---------- Pindah posyandu (salah posyandu atau pindah RT di dalam desa) ---------- */
+function sasaranPindah(D, kelompok, id) {
+  const l = kelompok === 'balita' ? D.balita : kelompok === 'ibu' ? D.ibu : D.lansia;
+  return (l || []).find(z => z.id === id);
+}
+function usulPindahTerbuka(kelompok, id) { return (S.d.usulPindah || []).find(u => u.kelompok === kelompok && u.idSasaran === id && u.status === 'Diusulkan'); }
+function tombolPindah(kelompok, id) {
+  const u = usulPindahTerbuka(kelompok, id);
+  if (u) return `<div class="pesan-awas" style="margin-top:12px">Diusulkan pindah ke <b>${esc(u.ke)}</b>, menunggu persetujuan admin.</div>`;
+  return `<button class="tautan-pindah" data-aksi="pindahPos" data-k="${kelompok}" data-id="${esc(id)}">Salah posyandu? Usulkan pindah posyandu</button>`;
+}
+function formPindahPos(kelompok, id) {
+  const sx = sasaranPindah(S.d, kelompok, id);
+  if (!sx) return;
+  bukaLembar(`<h3>Pindah posyandu</h3><div class="redup kecil" style="margin-bottom:12px">${esc(sx.nama)} · sekarang di ${esc(sx.posyandu)}. ${admin() ? 'Langsung berlaku.' : 'Usulan akan disetujui admin.'} Seluruh riwayat ikut pindah.</div>
+    <form id="fPindahPos" data-k="${kelompok}" data-id="${esc(id)}">
+      <label class="isian"><span>Posyandu tujuan *</span><select name="ke" required><option value="">Pilih…</option>${S.d.posyandu.filter(p => p !== sx.posyandu).map(p => `<option>${esc(p)}</option>`).join('')}</select></label>
+      <label class="isian"><span>Alasan *</span><input name="alasan" maxlength="150" required placeholder="Contoh: tinggal di RT 003/002, wilayah Lestari 3"></label>
+      <div id="galatPindah"></div>
+      <button class="tombol penuh" type="submit">${admin() ? 'Pindahkan' : 'Kirim usulan'}</button>
+      <button type="button" class="tombol garis penuh" style="margin-top:10px" data-aksi="tutup">Batal</button>
+    </form>`);
+}
+
 function formMutasi(id) {
   const b = S.d.byId[id];
   bukaLembar(`<h3>Keluarkan dari daftar</h3><div class="redup kecil" style="margin-bottom:12px">${esc(b.nama)}. ${admin() ? 'Langsung berlaku.' : 'Usulan akan disetujui admin.'} Data tidak dihapus.</div>
     <form id="fMutasi" data-id="${esc(id)}">
-      <label class="isian"><span>Alasan</span><select name="alasan" required><option value="">Pilih…</option><option>Pindah</option><option>Meninggal</option><option>Lainnya</option></select></label>
+      <label class="isian"><span>Alasan</span><select name="alasan" required><option value="">Pilih…</option><option>Pindah</option><option>Meninggal</option><option>Lainnya</option><option>Data ganda/salah input</option></select></label>
       <label class="isian"><span>Tanggal</span><input type="date" name="tanggal" value="${hariIni()}" max="${hariIni()}" required></label>
       <label class="isian"><span>Keterangan</span><input name="keterangan" placeholder="Contoh: pindah ke Kec. Bawang"></label>
+      <p class="redup kecil">Pilih <b>Data ganda/salah input</b> bila data ini dobel atau sebenarnya bukan sasaran. Data tidak dihitung lagi di laporan, termasuk bulan-bulan sebelumnya. Salah posyandu? Pakai tombol <b>Usulkan pindah posyandu</b>.</p>
       <button class="tombol bahaya penuh" type="submit">${admin() ? 'Keluarkan' : 'Kirim usulan'}</button>
       <button type="button" class="tombol garis penuh" style="margin-top:10px" data-aksi="tutup">Batal</button>
     </form>`);
@@ -1499,6 +1536,7 @@ function viewProfilLansia(id) {
         ${aktif ? `<button class="tombol" data-aksi="formPeriksaLP" data-id="${esc(id)}" data-p="${periodeKini()}">${ikon('ukur', 20)} Periksa</button>` : ''}
         <button class="tombol garis" data-aksi="ke" data-ke="ubah-lansia/${esc(id)}">Ubah data</button>
       </div>
+      ${aktif ? tombolPindah('lansia', id) : ''}
       ${aktif && !l.usulKeluar ? `<button class="tautan-bahaya" data-aksi="keluarL" data-id="${esc(id)}">Keluarkan dari daftar (pindah/meninggal)</button>` : ''}
     </div>
     ${t ? `<div class="kartu"><div class="baris antara"><h2 style="margin:0">Terakhir: ${namaPeriode(t.periode)}</h2><span class="lbl ${t.label}">${t.label}</span></div>
@@ -1571,9 +1609,10 @@ function formKeluarL(id) {
   const l = S.d.lansiaById[id];
   bukaLembar(`<h3>Keluarkan dari daftar lansia</h3><div class="redup kecil" style="margin-bottom:12px">${esc(l.nama)}. ${admin() ? 'Langsung berlaku.' : 'Usulan akan disetujui admin.'} Data tidak dihapus.</div>
     <form id="fKeluarL" data-id="${esc(id)}">
-      <label class="isian"><span>Alasan</span><select name="alasan" required><option value="">Pilih…</option><option>Meninggal</option><option>Pindah</option><option>Lainnya</option></select></label>
+      <label class="isian"><span>Alasan</span><select name="alasan" required><option value="">Pilih…</option><option>Meninggal</option><option>Pindah</option><option>Lainnya</option><option>Data ganda/salah input</option></select></label>
       <label class="isian"><span>Tanggal</span><input type="date" name="tanggal" value="${hariIni()}" max="${hariIni()}" required></label>
       <label class="isian"><span>Keterangan</span><input name="keterangan" maxlength="120"></label>
+      <p class="redup kecil">Pilih <b>Data ganda/salah input</b> bila data ini dobel atau sebenarnya bukan sasaran. Data tidak dihitung lagi di laporan, termasuk bulan-bulan sebelumnya. Salah posyandu? Pakai tombol <b>Usulkan pindah posyandu</b>.</p>
       <button class="tombol bahaya penuh" type="submit">${admin() ? 'Keluarkan' : 'Kirim usulan'}</button>
       <button type="button" class="tombol garis penuh" style="margin-top:10px" data-aksi="tutup">Batal</button>
     </form>`);
@@ -1868,6 +1907,7 @@ function viewProfilIbu(id) {
         <button class="tombol garis" data-aksi="ke" data-ke="ubah-bumil/${esc(id)}">Ubah data</button>
         ${hamil ? `<button class="tombol garis" data-aksi="persalinan" data-id="${esc(id)}">Catat persalinan</button>` : ''}
       </div>
+      ${x.status === 'Hamil' || x.status === 'Nifas' ? tombolPindah('ibu', id) : ''}
       ${hamil && !x.usulKeluar ? `<button class="tautan-bahaya" data-aksi="keluarIbu" data-id="${esc(id)}">Keluarkan (keguguran/pindah/meninggal)</button>` : ''}
     </div>
     ${x.tglPersalinan ? `<div class="kartu"><h2>Persalinan</h2><div class="tabel-wrap"><table>
@@ -1988,9 +2028,10 @@ function formKeluarIbu(id) {
   const x = S.d.ibuById[id];
   bukaLembar(`<h3>Keluarkan dari daftar ibu hamil</h3><div class="redup kecil" style="margin-bottom:12px">${esc(x.nama)}. ${admin() ? 'Langsung berlaku.' : 'Usulan akan disetujui admin.'} Data tidak dihapus.</div>
     <form id="fKeluarIbu" data-id="${esc(id)}">
-      <label class="isian"><span>Alasan</span><select name="alasan" required><option value="">Pilih…</option><option>Keguguran</option><option>Pindah</option><option>Meninggal</option><option>Lainnya</option></select></label>
+      <label class="isian"><span>Alasan</span><select name="alasan" required><option value="">Pilih…</option><option>Keguguran</option><option>Pindah</option><option>Meninggal</option><option>Lainnya</option><option>Data ganda/salah input</option></select></label>
       <label class="isian"><span>Tanggal</span><input type="date" name="tanggal" value="${hariIni()}" max="${hariIni()}" required></label>
       <label class="isian"><span>Keterangan</span><input name="keterangan" maxlength="120"></label>
+      <p class="redup kecil">Pilih <b>Data ganda/salah input</b> bila data ini dobel atau sebenarnya bukan sasaran. Data tidak dihitung lagi di laporan, termasuk bulan-bulan sebelumnya. Salah posyandu? Pakai tombol <b>Usulkan pindah posyandu</b>.</p>
       <button class="tombol bahaya penuh" type="submit">${admin() ? 'Keluarkan' : 'Kirim usulan'}</button>
       <button type="button" class="tombol garis penuh" style="margin-top:10px" data-aksi="tutup">Batal</button>
     </form>`);
@@ -2546,20 +2587,24 @@ function viewPersetujuan() {
     if (!r.ok) return tampilGagal(r);
     const d = r.data;
     el.innerHTML = `<div class="judul-bagian">Balita baru / data belum lengkap (${d.balita.length})</div>
-      ${d.balita.length ? `<div class="daftar">${d.balita.map(b => `<div class="item" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(b.nama)}</div>
+      ${d.balita.length ? `<div class="daftar">${d.balita.map(b => `<div class="item rinci" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(b.nama)}</div>
         <div class="sub">${b.jk || '?'} · lahir ${fmtTgl(b.tglLahir)} · Ibu ${esc(b.ibu || '–')} · ${esc(b.posyandu || 'posyandu kosong')} · oleh ${esc(b.oleh)}</div></span>
         <div class="deret-tombol" style="flex:none"><button class="tombol kecil" data-aksi="setujuiB" data-id="${esc(b.id)}" data-s="1" ${b.tglLahir && b.jk && b.posyandu ? '' : 'disabled title="Lengkapi data dulu"'}>Setujui</button>
         <button class="tombol bahaya kecil" data-aksi="setujuiB" data-id="${esc(b.id)}" data-s="0">Tolak</button><button class="tombol garis kecil" data-aksi="ke" data-ke="ubah-balita/${esc(b.id)}">Ubah</button></div></div>`).join('')}</div>` : '<div class="kosong" style="padding:14px">Tidak ada.</div>'}
-      ${(d.ibuKeluar || []).length ? `<div class="judul-bagian">Usulan keluar ibu hamil (${d.ibuKeluar.length})</div><div class="daftar">${d.ibuKeluar.map(m => `<div class="item" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(m.nama)}</div>
+      ${(d.pindahPos || []).length ? `<div class="judul-bagian">Usulan pindah posyandu (${d.pindahPos.length})</div><div class="daftar">${d.pindahPos.map(m => `<div class="item rinci" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(m.nama)}</div>
+        <div class="sub">${esc({ balita: 'Balita', ibu: 'Ibu hamil/nifas', lansia: 'Lansia' }[m.kelompok] || m.kelompok)} · ${esc(m.dari)} → <b>${esc(m.ke)}</b> · ${esc(m.alasan)} · ${fmtTgl(m.tanggal)} · oleh ${esc(m.oleh)}</div></span>
+        <div class="deret-tombol" style="flex:none"><button class="tombol kecil" data-aksi="setujuiPdh" data-id="${esc(m.id)}" data-s="1">Setujui</button>
+        <button class="tombol bahaya kecil" data-aksi="setujuiPdh" data-id="${esc(m.id)}" data-s="0">Tolak</button></div></div>`).join('')}</div>` : ''}
+      ${(d.ibuKeluar || []).length ? `<div class="judul-bagian">Usulan keluar ibu hamil (${d.ibuKeluar.length})</div><div class="daftar">${d.ibuKeluar.map(m => `<div class="item rinci" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(m.nama)}</div>
         <div class="sub">${esc(m.alasan)} · ${fmtTgl(m.tanggal)} · ${esc(m.posyandu)} · oleh ${esc(m.oleh)}</div></span>
         <div class="deret-tombol" style="flex:none"><button class="tombol kecil" data-aksi="setujuiKI" data-id="${esc(m.id)}" data-s="1">Setujui</button>
         <button class="tombol bahaya kecil" data-aksi="setujuiKI" data-id="${esc(m.id)}" data-s="0">Tolak</button></div></div>`).join('')}</div>` : ''}
-      ${(d.lansiaKeluar || []).length ? `<div class="judul-bagian">Usulan keluar lansia (${d.lansiaKeluar.length})</div><div class="daftar">${d.lansiaKeluar.map(m => `<div class="item" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(m.nama)}</div>
+      ${(d.lansiaKeluar || []).length ? `<div class="judul-bagian">Usulan keluar lansia (${d.lansiaKeluar.length})</div><div class="daftar">${d.lansiaKeluar.map(m => `<div class="item rinci" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(m.nama)}</div>
         <div class="sub">${esc(m.alasan)} · ${fmtTgl(m.tanggal)} · ${esc(m.posyandu)} · oleh ${esc(m.oleh)}</div></span>
         <div class="deret-tombol" style="flex:none"><button class="tombol kecil" data-aksi="setujuiKL" data-id="${esc(m.id)}" data-s="1">Setujui</button>
         <button class="tombol bahaya kecil" data-aksi="setujuiKL" data-id="${esc(m.id)}" data-s="0">Tolak</button></div></div>`).join('')}</div>` : ''}
       <div class="judul-bagian">Usulan keluar (${d.mutasi.length})</div>
-      ${d.mutasi.length ? `<div class="daftar">${d.mutasi.map(m => `<div class="item" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(m.nama)}</div>
+      ${d.mutasi.length ? `<div class="daftar">${d.mutasi.map(m => `<div class="item rinci" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(m.nama)}</div>
         <div class="sub">${esc(m.alasan)} · ${fmtTgl(m.tanggal)} · ${esc(m.posyandu)} · oleh ${esc(m.oleh)}${m.keterangan ? ' · ' + esc(m.keterangan) : ''}</div></span>
         <div class="deret-tombol" style="flex:none"><button class="tombol kecil" data-aksi="setujuiM" data-id="${esc(m.idMutasi)}" data-s="1">Setujui</button>
         <button class="tombol bahaya kecil" data-aksi="setujuiM" data-id="${esc(m.idMutasi)}" data-s="0">Tolak</button></div></div>`).join('')}</div>` : '<div class="kosong" style="padding:14px">Tidak ada.</div>'}
@@ -2740,6 +2785,13 @@ const AKSI = {
   },
   formPD3I: el => formPD3I(el.dataset.id, el.dataset.lapor),
   mutasi: el => formMutasi(el.dataset.id),
+  pindahPos: el => formPindahPos(el.dataset.k, el.dataset.id),
+  setujuiPdh: async el => {
+    el.disabled = true;
+    const r = await api('prosesPindahPosyandu', { id: el.dataset.id, setuju: el.dataset.s === '1' });
+    if (!r.ok) { toast(r.pesan); el.disabled = false; return; }
+    toast(el.dataset.s === '1' ? 'Sasaran dipindahkan.' : 'Usulan ditolak.'); render(); sinkron(true);
+  },
   formUser: el => formUser(el.dataset.i !== undefined ? +el.dataset.i : undefined),
   hapusUkur: async () => {
     const f = $('#fUkur'), b = S.d.byId[f.dataset.id];
@@ -2869,6 +2921,13 @@ const KIRIM = {
   fPeriksaB: f => simpanPeriksaBumilForm(f),
   fIbu: f => simpanIbuForm(f),
   fNifas: f => simpanNifasForm(f),
+  fPindahPos: async f => {
+    const kelompok = f.dataset.k, id = f.dataset.id, sx = sasaranPindah(S.d, kelompok, id), alasan = rapiSpasi(f.alasan.value);
+    if (!f.ke.value) { $('#galatPindah').innerHTML = '<div class="pesan-galat">Pilih posyandu tujuan.</div>'; return; }
+    if (alasan.length < 3) { $('#galatPindah').innerHTML = '<div class="pesan-galat">Tulis alasan pindah.</div>'; return; }
+    await antrekan('usulPindahPosyandu', { kelompok, id, ke: f.ke.value, alasan }, 'Pindah posyandu ' + sx.nama + ' ke ' + f.ke.value);
+    tutupLembar(); render(); toast(admin() ? 'Dipindahkan ke ' + f.ke.value + '.' : 'Usulan pindah terkirim ke admin.');
+  },
   fPersalinan: async f => {
     const x0 = S.d.ibuById[f.dataset.id];
     if (!f.tempat.value || !f.penolong.value || !f.cara.value || !f.kondisiIbu.value) { $('#galatSalin').innerHTML = '<div class="pesan-galat">Lengkapi tempat, penolong, cara, dan kondisi ibu.</div>'; return; }
