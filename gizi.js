@@ -158,7 +158,7 @@ function skorRisiko(f) {
 }
 
 /* ---------- Validasi input ---------- */
-function validasiUkur(d, tglLahir) {
+function validasiUkur(d, tglLahir, jk) {
   if (!d.tglUkur || isNaN(tglKeMs(d.tglUkur))) return 'Tanggal ukur wajib diisi.';
   if (periodeDari(d.tglUkur) !== d.periode) return 'Tanggal ukur harus di dalam periode ' + namaPeriode(d.periode) + '.';
   if (tglLahir && tglKeMs(d.tglUkur) < tglKeMs(tglLahir)) return 'Tanggal ukur sebelum tanggal lahir.';
@@ -167,6 +167,13 @@ function validasiUkur(d, tglLahir) {
   if (+d.tb && (+d.tb < 40 || +d.tb > 125)) return 'Tinggi/panjang badan harus 40 sampai 125 cm.';
   if (+d.lila && (+d.lila < 8 || +d.lila > 22)) return 'LiLA harus 8 sampai 22 cm.';
   if (+d.lk && (+d.lk < 30 || +d.lk > 56)) return 'Lingkar kepala harus 30 sampai 56 cm.';
+  // Batas kewajaran biologis WHO (salah ketik, mis. 12,4 kg untuk bayi 2 bulan, atau kg tertukar cm)
+  if ((jk === 'L' || jk === 'P') && tglLahir) {
+    var g = hitungGizi({ jk: jk, tglLahir: tglLahir, tglUkur: d.tglUkur, bb: d.bb, tb: d.tb, cara: d.cara, lila: d.lila, lk: d.lk });
+    var aneh = [['zBBU', -6, 5, 'Berat badan'], ['zTBU', -6, 6, 'Panjang/tinggi badan'], ['zBBTB', -5, 5, 'Berat menurut panjang/tinggi badan'], ['zLKU', -5, 5, 'Lingkar kepala']]
+      .filter(function (a) { var z = g[a[0]]; return z !== null && z !== undefined && (z < a[1] || z > a[2]); }).map(function (a) { return a[3]; });
+    if (aneh.length) return aneh.join(', ') + ' tidak mungkin untuk anak usia ' + g.usiaBln + ' bulan (di luar batas WHO). Periksa kembali angka dan satuannya (kg, cm).';
+  }
   return '';
 }
 /* Peringatan (boleh tetap disimpan). lalu = pengukuran bulan sebelumnya */
@@ -340,7 +347,11 @@ function validasiLansia(d) {
   if (+d.au && (+d.au < 1 || +d.au > 20)) return 'Asam urat harus 1 sampai 20 mg/dL.';
   if (+d.bb && (+d.bb < 20 || +d.bb > 200)) return 'Berat badan harus 20 sampai 200 kg.';
   if (+d.tb && (+d.tb < 100 || +d.tb > 200)) return 'Tinggi badan harus 100 sampai 200 cm.';
-  if (+d.lp && (+d.lp < 40 || +d.lp > 200)) return 'Lingkar perut harus 40 sampai 200 cm.';
+  if (+d.lp && (+d.lp < 50 || +d.lp > 160)) return 'Lingkar perut harus 50 sampai 160 cm.';
+  if (+d.bb && +d.tb) {
+    var imt = +d.bb / Math.pow(+d.tb / 100, 2);
+    if (imt < 10 || imt > 60) return 'Berat dan tinggi badan tidak cocok (IMT ' + String(Math.round(imt * 10) / 10).replace('.', ',') + '). Periksa kembali angka dan satuannya (kg, cm).';
+  }
   if ((+d.sistol > 0) !== (+d.diastol > 0)) return 'Isi tekanan darah lengkap: sistol dan diastol.';
   if (+d.sistol && (+d.sistol < 60 || +d.sistol > 260)) return 'Sistol harus 60 sampai 260 mmHg.';
   if (+d.diastol && (+d.diastol < 30 || +d.diastol > 160)) return 'Diastol harus 30 sampai 160 mmHg.';
@@ -356,6 +367,12 @@ function validasiLansia(d) {
 var TANDA_BAHAYA_HAMIL = ['Perdarahan dari jalan lahir', 'Bengkak kaki/tangan/wajah dengan sakit kepala atau pandangan kabur', 'Demam tinggi',
   'Keluar air ketuban sebelum waktunya', 'Gerakan janin berkurang atau tidak terasa', 'Muntah terus dan tidak mau makan', 'Kejang'];
 var EDUKASI_BUMIL = ['Tanda bahaya kehamilan', 'Gizi ibu hamil', 'Minum TTD', 'Persiapan persalinan (P4K)', 'ASI eksklusif & IMD', 'KB pasca salin'];
+var UK_MAKS = 44, UK_MIN_PERSALINAN = 20;
+function validasiHPHT(hpht, hariIni) {
+  var uk = usiaKehamilan(hpht, hariIni);
+  if (uk !== null && uk > UK_MAKS) return 'Menurut HPHT, usia kehamilan sudah ' + uk + ' minggu, tidak mungkin (paling lama ' + UK_MAKS + ' minggu). Periksa tahun HPHT; bila sudah melahirkan, pakai Catat persalinan.';
+  return '';
+}
 function hplDari(hpht) { return hpht ? tglIso(tglKeMs(hpht) + 280 * 864e5) : ''; }
 function usiaKehamilan(hpht, tgl) { if (!hpht || !tgl) return null; var h = Math.floor((tglKeMs(tgl) - tglKeMs(hpht)) / 864e5); return h < 0 ? null : Math.floor(h / 7); }
 function trimester(minggu) { return minggu === null || minggu === undefined ? '' : minggu <= 13 ? 'I' : minggu <= 27 ? 'II' : 'III'; }

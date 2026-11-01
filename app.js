@@ -340,7 +340,7 @@ function terapkanLokal(d, it) {
       Object.assign(i, { status: x.kondisiIbu === 'Meninggal' ? 'Meninggal' : 'Nifas', tglPersalinan: x.tgl, tempatPersalinan: x.tempat, penolong: x.penolong,
         caraPersalinan: x.cara, kondisiIbu: x.kondisiIbu, idBayi: x.bayiHidup === 'Y' ? x.idBayi : '', _lokal: true });
       if (x.bayiHidup === 'Y' && !d.byId[x.idBayi]) {
-        const bayi = { id: x.idBayi, nama: rapiNama(x.namaBayi) || 'BAYI NY ' + i.nama, jk: x.jkBayi, tglLahir: x.tgl, ibu: i.nama, ayah: i.suami, rt: i.rt, rw: i.rw,
+        const bayi = { id: x.idBayi, nama: rapiNama(x.namaBayi) || 'BAYI NY. ' + i.nama, jk: x.jkBayi, tglLahir: x.tgl, ibu: i.nama, ayah: i.suami, rt: i.rt, rw: i.rw,
           posyandu: i.posyandu, status: 'Aktif', nik: '', nikHash: '', kk: '', hp: '', bbLahir: gramLahir(x.bbLahir) || '', pbLahir: bacaAngka(x.pbLahir) || '',
           prematur: 'T', tglMasuk: x.tgl, tglKeluar: '', catatan: '', _lokal: true };
         d.balita.push(bayi); d.byId[bayi.id] = bayi;
@@ -468,7 +468,7 @@ function terimaHasil(it, h) {
     case 'catatPersalinan': {
       const i = D.ibu.find(z => z.id === x.id);
       if (i) Object.assign(i, { status: h.status, tglPersalinan: x.tgl, tempatPersalinan: x.tempat, penolong: x.penolong, caraPersalinan: x.cara, kondisiIbu: x.kondisiIbu, idBayi: h.idBayi });
-      if (h.idBayi && !D.balita.find(z => z.id === h.idBayi) && i) D.balita.push({ id: h.idBayi, nama: rapiNama(x.namaBayi) || 'BAYI NY ' + i.nama, jk: x.jkBayi, tglLahir: x.tgl,
+      if (h.idBayi && !D.balita.find(z => z.id === h.idBayi) && i) D.balita.push({ id: h.idBayi, nama: rapiNama(x.namaBayi) || 'BAYI NY. ' + i.nama, jk: x.jkBayi, tglLahir: x.tgl,
         ibu: i.nama, ayah: i.suami, rt: i.rt, rw: i.rw, posyandu: i.posyandu, status: 'Aktif', nik: '', nikHash: '', kk: '', hp: '', bbLahir: gramLahir(x.bbLahir) || '',
         pbLahir: bacaAngka(x.pbLahir) || '', prematur: 'T', tglMasuk: x.tgl, tglKeluar: '', catatan: '' });
       break; }
@@ -997,16 +997,11 @@ async function simpanUkur(f) {
     x[k] = n === '' ? 0 : n;
   }
   x.edukasi = Array.from(f.querySelectorAll('input[name=edu]:checked')).map(i => i.value).join(', ');
-  const err = validasiUkur(x, b.tglLahir);
+  const err = validasiUkur(x, b.tglLahir, b.jk);
   if (err) { $('#galatUkur').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
   if (usiaBulan(b.tglLahir, x.tglUkur) > 60) { $('#galatUkur').innerHTML = `<div class="pesan-galat">Usia sudah lebih dari 60 bulan.</div>`; return; }
   const lalu = ukurDi(id, geserPeriode(periode, -1));
   const w = peringatanUkur(x, lalu);
-  // Nilai di luar batas kewajaran WHO (salah ketik, mis. 12,4 untuk bayi 2 bulan atau kg tertukar cm)
-  const g = hitungGizi({ jk: b.jk, tglLahir: b.tglLahir, tglUkur: x.tglUkur, bb: x.bb, tb: x.tb, cara: x.cara, lila: x.lila, lk: x.lk });
-  const aneh = [['zBBU', -6, 5, 'Berat badan menurut umur'], ['zTBU', -6, 6, 'Tinggi badan menurut umur'], ['zBBTB', -5, 5, 'Berat menurut tinggi'], ['zLKU', -5, 5, 'Lingkar kepala']]
-    .filter(([k, lo, hi]) => g[k] !== null && g[k] !== undefined && (g[k] < lo || g[k] > hi)).map(a => a[3] + ' sangat tidak wajar untuk usia ' + usiaTeks(g.usiaBln) + '.');
-  w.unshift(...aneh);
   if (w.length && !await konfirmasi('Periksa kembali angkanya', w.map(esc).join('<br>') + '<br><br>Apakah angka sudah benar?', 'Ya, tetap simpan')) return;
   await antrekan('simpanPengukuran', x, 'Ukur ' + b.nama + ' (' + namaPeriode(periode) + ')');
   const u = ukurDi(id, periode);
@@ -1814,7 +1809,7 @@ function tampilHasilBumil(x, u) {
     <table><tr><th>Pemeriksaan</th><th class="angka-sel">Hasil</th><th>Status</th></tr>
       ${baris('Tekanan darah', +u.sistol ? u.sistol + '/' + u.diastol + ' mmHg' : '', u.stTD)}${baris('LiLA', +u.lila ? angka(u.lila) + ' cm' : '', u.stLILA)}
       ${baris('Berat badan', +u.bb ? angka(u.bb) + ' kg' : '', '')}${baris('Hb', +u.hb ? angka(u.hb) + ' g/dL' : '', u.stHb)}
-      ${baris('TTD bulan ini', u.ttd ? u.ttd + (u.ttdJumlah !== '' && u.ttdJumlah !== undefined ? ' (' + u.ttdJumlah + ')' : '') : '', '')}
+      ${baris('TTD bulan ini', u.ttd ? u.ttd + (u.ttdJumlah !== '' && u.ttdJumlah !== undefined ? ' (' + u.ttdJumlah + ' tablet)' : '') : '', '')}
       ${baris('Periksa ke nakes', u.anc === 'Y' ? 'Ya' : u.anc === 'T' ? 'Belum' : '', '')}</table>
     ${u.edukasi ? `<p class="kecil">Edukasi: ${esc(u.edukasi)}</p>` : ''}
     <p class="redup kecil">Hasil ini penanda dini, bukan diagnosis. Pemeriksaan kehamilan oleh bidan/dokter.${u.label === 'Merah' ? ' Minta ibu segera ke bidan atau Puskesmas.' : ''}</p>
@@ -1840,10 +1835,10 @@ function viewProfilIbu(id) {
       ${x.usulKeluar ? `<div class="pesan-awas" style="margin-top:12px">Diusulkan keluar (${esc(x.usulKeluar)}), menunggu persetujuan admin.</div>` : ''}
       <div class="tabel-wrap"><table style="margin-top:8px">
         ${ket('HPHT', fmtTgl(x.hpht))}${ket('HPL (perkiraan lahir)', `<b>${fmtTgl(x.hpl)}</b>`)}
-        ${ket('Kehamilan', `G${x.gravida === '' ? '?' : x.gravida} P${x.para === '' ? '?' : x.para} A${x.abortus === '' ? '?' : x.abortus}`)}
+        ${ket('Kehamilan', `G${x.gravida === '' ? '–' : x.gravida} P${x.para === '' ? '–' : x.para} A${x.abortus === '' ? '–' : x.abortus}`)}
         ${ket('Tanggal lahir ibu', fmtTgl(x.tglLahir))}${ket('NIK', esc(x.nik || '–'))}${ket('Suami', esc(x.suami || '–'))}
         ${ket('RT / RW', rtRw(x).slice(6))}${x.hp ? ket('No HP', `<a href="tel:${esc(x.hp)}">${esc(x.hp)}</a>`) : ''}
-        ${ket('Tinggi badan', x.tb ? angka(x.tb) + ' cm' : '–')}${ket('Buku KIA / stiker P4K', yt(x.bukuKIA) + ' / ' + yt(x.p4k))}
+        ${ket('Tinggi badan', x.tb ? angka(x.tb) + ' cm' : '–')}${ket('BB sebelum hamil', x.bbPra ? angka(x.bbPra) + ' kg' : '–')}${ket('Buku KIA / stiker P4K', yt(x.bukuKIA) + ' / ' + yt(x.p4k))}
         ${x.catatan ? ket('Catatan', esc(x.catatan)) : ''}
       </table></div>
       <div class="deret-tombol" style="margin-top:12px">
@@ -1930,6 +1925,8 @@ async function simpanIbuForm(f) {
     : Number.isNaN(tb) || (tb !== '' && (tb < 120 || tb > 200)) ? 'Tinggi badan harus 120 sampai 200 cm.'
     : Number.isNaN(bbPra) || (bbPra !== '' && (bbPra < 30 || bbPra > 150)) ? 'Berat badan sebelum hamil harus 30 sampai 150 kg.' : '';
   if (err) { $('#galatIbu').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
+  const eh = !f.dataset.id || (S.d.ibuById[f.dataset.id] || {}).status === 'Hamil' ? validasiHPHT(f.hpht.value, hariIni()) : '';
+  if (eh || (f.hpht.value && f.hpht.value <= f.tglLahir.value)) { $('#galatIbu').innerHTML = `<div class="pesan-galat">${esc(eh || 'HPHT harus setelah tanggal lahir ibu.')}</div>`; return; }
   if (!f.dataset.id && uk !== null && uk > 42 && !await konfirmasi('Periksa HPHT', `Menurut HPHT, usia kehamilan sudah ${uk} minggu (melewati 42 minggu). Tetap simpan?`, 'Tetap simpan')) return;
   const id = f.dataset.id || idBaru('IBU-K');
   const x = { id, nama, tglLahir: f.tglLahir.value, hpht: f.hpht.value, gravida: f.gravida.value, para: f.para.value, abortus: f.abortus.value,
@@ -1953,7 +1950,7 @@ function formPersalinan(id) {
       </div>
       <div class="judul-sub">Bayi</div>
       <label class="isian"><span>Bayi lahir hidup</span><select name="bayiHidup"><option value="Y">Ya — otomatis masuk data balita</option><option value="T">Tidak</option></select></label>
-      <label class="isian"><span>Nama bayi (boleh dikosongkan)</span><input name="namaBayi" maxlength="60" autocapitalize="characters" placeholder="BAYI NY ${esc(x.nama)}"></label>
+      <label class="isian"><span>Nama bayi (boleh dikosongkan)</span><input name="namaBayi" maxlength="60" autocapitalize="characters" placeholder="BAYI NY. ${esc(x.nama)}"></label>
       <div class="grid3">
         <label class="isian"><span>JK</span><select name="jkBayi"><option value="">–</option><option value="L">L</option><option value="P">P</option></select></label>
         <label class="isian"><span>BB lahir (g)</span><input name="bbLahir" inputmode="decimal" enterkeyhint="next" placeholder="3200"></label>
@@ -2125,7 +2122,7 @@ async function simpanNifasForm(f) {
     <div class="hasil ${u.label}"><div class="baris antara"><b>${u.label === 'Merah' ? 'Perlu rujukan' : u.label === 'Kuning' ? 'Waspada' : 'Baik'}</b><span class="lbl ${u.label}">${u.label}</span></div>
       ${u.alasan ? `<ul>${u.alasan.split('; ').map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '<div class="kecil">Tidak ada temuan pada kunjungan ini.</div>'}</div>
     <div class="deret-tombol" style="margin:10px 0">${kf.map(k => `<span class="lbl ${WARNA_KF[k.status]}">${k.kode}: ${k.status}</span>`).join(' ')}</div>
-    <p class="kecil">ASI: ${esc(u.asi || '–')} · KB: ${esc(xi.kbMetode || '–')}${u.edukasi ? ' · Edukasi: ' + esc(u.edukasi) : ''}</p>
+    <p class="kecil">${u.sistol ? 'TD: ' + u.sistol + '/' + u.diastol + ' mmHg · ' : ''}ASI: ${esc(u.asi || '–')} · KB: ${esc(xi.kbMetode || '–')}${u.edukasi ? ' · Edukasi: ' + esc(u.edukasi) : ''}</p>
     <p class="redup kecil">Penanda dini, bukan diagnosis. Kunjungan nifas (KF) oleh bidan; kader mengingatkan dan memantau.</p>
     <button class="tombol garis penuh" data-aksi="tutupRender">Selesai</button>`);
 }
@@ -2849,6 +2846,8 @@ const KIRIM = {
   fPersalinan: async f => {
     const x0 = S.d.ibuById[f.dataset.id];
     if (!f.tempat.value || !f.penolong.value || !f.cara.value || !f.kondisiIbu.value) { $('#galatSalin').innerHTML = '<div class="pesan-galat">Lengkapi tempat, penolong, cara, dan kondisi ibu.</div>'; return; }
+    const ukSalin = usiaKehamilan(x0.hpht, f.tgl.value);
+    if (ukSalin !== null && ukSalin < UK_MIN_PERSALINAN) { $('#galatSalin').innerHTML = `<div class="pesan-galat">Usia kehamilan pada tanggal itu baru ${ukSalin} minggu. Kehamilan di bawah ${UK_MIN_PERSALINAN} minggu dicatat sebagai keguguran lewat Keluarkan.</div>`; return; }
     const hidup = f.bayiHidup.value === 'Y', bb = gramLahir(f.bbLahir.value), pb = bacaAngka(f.pbLahir.value);
     if (hidup && !f.jkBayi.value) { $('#galatSalin').innerHTML = '<div class="pesan-galat">Pilih jenis kelamin bayi.</div>'; return; }
     if (hidup && (Number.isNaN(bb) || (bb !== '' && (bb < 500 || bb > 6000)))) { $('#galatSalin').innerHTML = '<div class="pesan-galat">Berat lahir diisi dalam gram (500–6.000).</div>'; return; }
