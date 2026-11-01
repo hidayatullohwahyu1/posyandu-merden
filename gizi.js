@@ -438,6 +438,20 @@ function statusKF(tglPersalinan, hariIni, tgl) {
     return { kode: k.kode, teks: k.teks, tgl: tgl[k.kode] || '', status: st };
   });
 }
+/* Tanggal KF1–KF4 harus di dalam jendela waktunya; tanggal KB sesudah persalinan. tgl = {kf1..kf4, kbTgl} */
+function validasiTglNifas(tglPersalinan, hariIni, tgl) {
+  var fmt = function (t) { return t.slice(8, 10) + '/' + t.slice(5, 7) + '/' + t.slice(0, 4); };
+  var geser = function (n) { return tglIso(tglKeMs(tglPersalinan) + n * 864e5); };
+  for (var i = 0; i < JADWAL_KF.length; i++) {
+    var k = JADWAL_KF[i], v = tgl[k.kode.toLowerCase()];
+    if (!v) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || v > hariIni) return 'Tanggal ' + k.kode + ' tidak valid.';
+    var hari = Math.floor((tglKeMs(v) - tglKeMs(tglPersalinan)) / 864e5);
+    if (hari < k.dari || hari > k.sampai) return k.kode + ' adalah kunjungan hari ke-' + k.dari + ' sampai ' + k.sampai + ' setelah persalinan (' + fmt(geser(k.dari)) + '–' + fmt(geser(k.sampai)) + ').';
+  }
+  if (tgl.kbTgl && (!/^\d{4}-\d{2}-\d{2}$/.test(tgl.kbTgl) || tgl.kbTgl < tglPersalinan || tgl.kbTgl > hariIni)) return 'Tanggal mulai KB harus sesudah persalinan dan tidak setelah hari ini.';
+  return '';
+}
 /* d = {sistol, diastol, bahaya, asi, usiaBayiBln, masalah, kb, hariPasca} */
 function hitungNifas(d) {
   var merah = [], kuning = [], s = +d.sistol || 0, di = +d.diastol || 0;

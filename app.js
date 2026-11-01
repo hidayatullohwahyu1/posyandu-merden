@@ -438,6 +438,7 @@ function terimaHasil(it, h) {
       if (x.nik) isi.nik = S.sesi.user.peran === 'admin' ? x.nik : x.nik.slice(0, 4) + 'xxxxxxxx' + x.nik.slice(-4);
       if (x.kk) isi.kk = S.sesi.user.peran === 'admin' ? x.kk : x.kk.slice(0, 4) + 'xxxxxxxx' + x.kk.slice(-4);
       Object.assign(b, isi);
+      if (h.hitungUlang) S.perluSinkron = true;   // z-score pengukuran lama dihitung ulang di server: ambil versi barunya
       break; }
     case 'usulMutasi':
       if (h.status === 'Disetujui') { const b = D.balita.find(z => z.id === x.id); if (b) { b.status = x.jenis === 'Masuk' ? 'Aktif' : x.alasan === 'Meninggal' ? 'Meninggal' : 'Pindah'; b.tglKeluar = x.jenis === 'Masuk' ? '' : x.tanggal; } }
@@ -581,6 +582,7 @@ async function kirimAntrean() {
     perbaruiStatus();
     if (berhasil) segarkan();
   }
+  if (S.perluSinkron && S.online) { S.perluSinkron = false; sinkron(true); }
   if (S.antrean.some(o => o.status === 'menunggu' && o.user === S.sesi.user.username) && S.online) setTimeout(kirimAntrean, 800);
   else if (S.antrean.some(o => o.status === 'gagal')) toast('Ada kiriman yang ditolak server. Lihat menu Antrean.', 4500);
 }
@@ -2131,7 +2133,8 @@ async function simpanNifasForm(f) {
     sistol: s === '' || Number.isNaN(s) ? 0 : s, diastol: d === '' || Number.isNaN(d) ? 0 : d };
   const err = !x.tgl || periodeDari(x.tgl) !== periode ? 'Tanggal kunjungan harus di dalam periode ' + namaPeriode(periode) + '.'
     : x.tgl < x0.tglPersalinan ? 'Tanggal kunjungan sebelum persalinan.' : Number.isNaN(s) || Number.isNaN(d) ? 'Tekanan darah harus berupa angka.'
-    : (x.sistol > 0) !== (x.diastol > 0) ? 'Isi tekanan darah lengkap: sistol dan diastol.' : x.sistol && (x.sistol <= x.diastol || x.sistol > 260 || x.sistol < 60) ? 'Tekanan darah tidak wajar.' : '';
+    : (x.sistol > 0) !== (x.diastol > 0) ? 'Isi tekanan darah lengkap: sistol dan diastol.' : x.sistol && (x.sistol <= x.diastol || x.sistol > 260 || x.sistol < 60) ? 'Tekanan darah tidak wajar.'
+    : validasiTglNifas(x0.tglPersalinan, hariIni(), { kf1: x.kf1, kf2: x.kf2, kf3: x.kf3, kf4: x.kf4, kbTgl: sudahBerKB(x.kbMetode) ? x.kbTgl : '' });
   if (err) { $('#galatNifas').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
   if (x.bahaya && !await konfirmasi('Ada tanda bahaya nifas', 'Minta ibu <b>segera ke bidan atau Puskesmas</b>. Data ini juga dilaporkan ke admin desa.', 'Simpan & laporkan', true)) return;
   await antrekan('simpanKunjunganNifas', x, 'Kunjungan nifas ' + x0.nama + ' (' + namaPeriode(periode) + ')');
