@@ -190,6 +190,8 @@ function olahData(raw) {
   ls.periksa.forEach(r => { const o = ob(ls.kolPeriksa, r); (periksaL[o.id] = periksaL[o.id] || {})[o.periode] = o; });
   const ib = raw.ibu || { kolIbu: [], ibu: [], kolPeriksa: KOL_PERIKSA_IBU, periksa: [] }, periksaIbu = {};
   ib.periksa.forEach(r => { const o = ob(ib.kolPeriksa, r); (periksaIbu[o.id] = periksaIbu[o.id] || {})[o.periode] = o; });
+  const nifasIbu = {};
+  (ib.nifas || []).forEach(r => { const o = ob(ib.kolNifas || KOL_NIFAS, r); (nifasIbu[o.id] = nifasIbu[o.id] || {})[o.periode] = o; });
   const skriningL = {};
   (ls.skrining || []).forEach(r => { const o = ob(ls.kolSkrining || KOL_SKRINING, r); (skriningL[o.id] = skriningL[o.id] || {})[o.periode] = o; });
   return {
@@ -197,7 +199,8 @@ function olahData(raw) {
     kolUkur: raw.kolUkur, balita: raw.balita.map(r => ob(raw.kolBalita, r)), ukur, imun, vit,
     tl: raw.tl, usulan: raw.usulan, jadwal: raw.jadwal, kbm: raw.kbm, kunci: raw.kunci, kpsp, pd3i: lay.pd3i.map(pd3iObj),
     lansia: ls.lansia.map(r => ob(ls.kolLansia, r)), kolPeriksaL: ls.kolPeriksa, periksaL, skriningL, kolSkrining: ls.kolSkrining || KOL_SKRINING,
-    ibu: ib.ibu.map(r => ob(ib.kolIbu, r)), kolPeriksaIbu: ib.kolPeriksa, periksaIbu
+    ibu: ib.ibu.map(r => ob(ib.kolIbu, r)), kolPeriksaIbu: ib.kolPeriksa, periksaIbu, kolIbu: ib.kolIbu.length ? ib.kolIbu : KOL_IBU_C,
+    nifasIbu, kolNifas: ib.kolNifas || KOL_NIFAS
   };
 }
 const KOL_PERIKSA_L = ['id', 'periode', 'tgl', 'bb', 'tb', 'imt', 'stIMT', 'lp', 'stLP', 'sistol', 'diastol', 'stTD', 'obat', 'merokok', 'label', 'alasan', 'diubahPada', 'petugas',
@@ -214,7 +217,7 @@ function susunData() {
   d.kpsp = d.kpsp || {}; d.pd3i = d.pd3i || [];   // data tersimpan dari versi lama
   d.lansia = d.lansia || []; d.periksaL = d.periksaL || {}; d.skriningL = d.skriningL || {}; d.lansiaById = {};
   d.lansia.forEach(l => { d.lansiaById[l.id] = l; });
-  d.ibu = d.ibu || []; d.periksaIbu = d.periksaIbu || {}; d.ibuById = {};
+  d.ibu = d.ibu || []; d.periksaIbu = d.periksaIbu || {}; d.nifasIbu = d.nifasIbu || {}; d.ibuById = {};
   d.ibu.forEach(x => { d.ibuById[x.id] = x; });
   d.balita.forEach(b => { d.byId[b.id] = b; });
   S.antrean.filter(it => it.status !== 'gagal').forEach(it => terapkanLokal(d, it));
@@ -320,6 +323,18 @@ function terapkanLokal(d, it) {
     case 'hapusPeriksaBumil':
       if (d.periksaIbu[x.id]) delete d.periksaIbu[x.id][x.periode];
       break;
+    case 'simpanKunjunganNifas': {
+      const i = d.ibuById[x.id]; if (!i || !i.tglPersalinan) return;
+      ['kf1', 'kf2', 'kf3', 'kf4'].forEach(k => { if (x[k] !== undefined) i[k] = x[k]; });
+      if (x.vitANifas) i.vitANifas = x.vitANifas;
+      if (x.imd) i.imd = x.imd;
+      if (x.kbMetode) { i.kbMetode = x.kbMetode; i.kbTgl = sudahBerKB(x.kbMetode) ? x.kbTgl : ''; }
+      const hari = Math.floor((tglKeMs(x.tgl) - tglKeMs(i.tglPersalinan)) / 864e5), usiaBayi = usiaBulan(i.tglPersalinan, x.tgl);
+      const h = hitungNifas({ sistol: x.sistol, diastol: x.diastol, bahaya: x.bahaya, asi: x.asi, usiaBayiBln: usiaBayi, masalah: x.masalah, kb: i.kbMetode, hariPasca: hari });
+      (d.nifasIbu[i.id] = d.nifasIbu[i.id] || {})[x.periode] = { id: i.id, periode: x.periode, tgl: x.tgl, hariPasca: hari, usiaBayi, sistol: x.sistol || '', diastol: x.diastol || '',
+        stTD: h.stTD, bahaya: x.bahaya, asi: x.asi, masalah: x.masalah, edukasi: x.edukasi, label: h.label, alasan: h.alasan.join('; '), diubahPada: '',
+        petugas: S.sesi ? S.sesi.user.username : '', _lokal: true };
+      break; }
     case 'catatPersalinan': {
       const i = d.ibuById[x.id]; if (!i) return;
       Object.assign(i, { status: x.kondisiIbu === 'Meninggal' ? 'Meninggal' : 'Nifas', tglPersalinan: x.tgl, tempatPersalinan: x.tempat, penolong: x.penolong,
@@ -396,6 +411,9 @@ function terimaHasil(it, h) {
   if (!D.ibu) D.ibu = [];
   if (!D.periksaIbu) D.periksaIbu = {};
   if (!D.kolPeriksaIbu) D.kolPeriksaIbu = KOL_PERIKSA_IBU;
+  if (!D.nifasIbu) D.nifasIbu = {};
+  if (!D.kolNifas) D.kolNifas = KOL_NIFAS;
+  if (!D.kolIbu) D.kolIbu = KOL_IBU_C;
   const masihAda = S.antrean.some(o => o !== it && o.kunci && o.kunci === it.kunci && o.status !== 'gagal');
   switch (it.action) {
     case 'simpanPengukuran':
@@ -440,6 +458,12 @@ function terimaHasil(it, h) {
     case 'simpanPeriksaBumil':
       if (!masihAda) { const r = {}; D.kolPeriksaIbu.forEach((k, i) => { r[k] = h.periksa[i]; }); (D.periksaIbu[r.id] = D.periksaIbu[r.id] || {})[r.periode] = r; }
       break;
+    case 'simpanKunjunganNifas': {
+      const r = {}; D.kolNifas.forEach((k, i) => { r[k] = h.nifas[i]; });
+      if (!masihAda) (D.nifasIbu[r.id] = D.nifasIbu[r.id] || {})[r.periode] = r;
+      const o = {}; D.kolIbu.forEach((k, i) => { o[k] = h.ibu[i]; });
+      const i = D.ibu.find(z => z.id === o.id); if (i) Object.assign(i, o); else D.ibu.push(o);
+      break; }
     case 'hapusPeriksaBumil': if (!masihAda && D.periksaIbu[x.id]) delete D.periksaIbu[x.id][x.periode]; break;
     case 'catatPersalinan': {
       const i = D.ibu.find(z => z.id === x.id);
@@ -507,6 +531,7 @@ function kunciAntrean(a, x) {
   if (a === 'simpanIbu') return 'ibu|' + x.id;
   if (a === 'simpanPeriksaBumil' || a === 'hapusPeriksaBumil') return 'pb|' + x.id + '|' + x.periode;
   if (a === 'catatPersalinan') return 'salin|' + x.id;
+  if (a === 'simpanKunjunganNifas') return 'nifas|' + x.id + '|' + x.periode;
   if (a === 'simpanSkriningLansia') return 'skl|' + x.id + '|' + x.tgl.slice(0, 7);
   if (a === 'simpanKPSP') return 'kpsp|' + x.id + '|' + x.usiaKpsp;
   if (a === 'laporPD3I') return 'pd3i|' + x.idLapor;
@@ -700,6 +725,7 @@ function segarkan() {
     if ($('#daftarB')) isiDataBalita();
     if ($('#daftarL')) isiDaftarLansia();
     if ($('#daftarIbu')) isiDaftarIbu();
+    if ($('#daftarNifas')) isiDaftarNifas();
     return;
   }
   render();
@@ -768,11 +794,12 @@ function viewBeranda() {
   const sl = sasaranLansia(), sdL = sl.filter(l => periksaDi(l.id, P)).length, pctL = sl.length ? Math.round(sdL / sl.length * 100) : 0;
   const skrTempo = sl.filter(l => skriningTempo(l.id)).length;
   const si = sasaranIbu(), sdI = si.filter(x => kunjunganDi(x.id, P)).length, pctI = si.length ? Math.round(sdI / si.length * 100) : 0, hplDekat = ibuHPLDekat().length;
+  const sn = sasaranNifas(), kfCek = sn.filter(x => kfPerlu(x).length).length;
   const layananIbu = [
     ['ke', 'bumil', 'w-pink', 'nadi', 'Kunjungan bumil'],
+    ['ke', 'nifas', 'w-tosca', 'bayi', 'Nifas & menyusui', kfCek],
     ['ke', 'tambah-bumil', 'w-ungu', 'tambah', 'Tambah bumil'],
-    ['keHPL', '', 'w-oranye', 'jam', 'HPL ≤ 30 hari', hplDekat],
-    ['ke', 'materi-bumil', 'w-hijau', 'buku', 'Edukasi bumil']
+    ['ke', 'materi-bumil', 'w-hijau', 'buku', 'Edukasi ibu']
   ];
   const layananBalita = [
     ['ke', 'imunisasi', 'w-biru', 'suntik', 'Imunisasi'],
@@ -858,11 +885,11 @@ function viewBeranda() {
       <button class="ubin ungu" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('jam', 22)}</span><span><b>${ris.Absen.length}</b><span>Absen timbang ≥ 2 bulan</span></span></button>
       ${sl.length ? `<button class="ubin merah" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('nadi', 22)}</span><span><b>${lansiaMerah().length}</b><span>Lansia perlu rujukan</span></span></button>
       <button class="ubin kuning" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('papan', 22)}</span><span><b>${lansiaPerluSkrining().length}</b><span>Temuan skrining lansia</span></span></button>` : ''}
-      ${si.length ? `<button class="ubin merah" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('awas', 22)}</span><span><b>${ibuMerah().length}</b><span>Ibu hamil perlu rujukan</span></span></button>
+      ${si.length || sn.length ? `<button class="ubin merah" data-aksi="ke" data-ke="risiko"><span class="ik">${ikon('awas', 22)}</span><span><b>${ibuMerah().length + nifasMerah().length}</b><span>Ibu hamil/nifas perlu rujukan</span></span></button>
       <button class="ubin kuning" data-aksi="keHPL"><span class="ik">${ikon('jam', 22)}</span><span><b>${hplDekat}</b><span>Ibu hamil HPL ≤ 30 hari</span></span></button>` : ''}
     </div>
     <div class="judul-bagian">Layanan</div>
-    ${grup('Balita', layananBalita)}${grup('Ibu hamil', layananIbu)}${grup('Lansia', layananLansia)}${grup('Umum', layananUmum)}
+    ${grup('Balita', layananBalita)}${grup('Ibu hamil & nifas', layananIbu)}${grup('Lansia', layananLansia)}${grup('Umum', layananUmum)}
     ${admin() ? `<div class="judul-bagian">Admin desa</div>${grup('Pemantauan & pengaturan', layananAdmin)}` : ''}
     <p class="info-sinkron">Sinkron terakhir: ${menitSinkron < 1 ? 'baru saja' : menitSinkron < 60 ? menitSinkron + ' menit lalu' : fmtTgl(String(S.dasar.waktu).slice(0, 10))}</p>` };
 }
@@ -1829,7 +1856,8 @@ function viewProfilIbu(id) {
     ${x.tglPersalinan ? `<div class="kartu"><h2>Persalinan</h2><div class="tabel-wrap"><table>
       ${ket('Tanggal', fmtTgl(x.tglPersalinan))}${ket('Tempat / penolong', esc(x.tempatPersalinan + ' / ' + x.penolong))}${ket('Cara', esc(x.caraPersalinan))}
       ${ket('Kondisi ibu', esc(x.kondisiIbu || '–'))}${ket('Bayi', bayi ? `<a href="#/balita/${esc(bayi.id)}">${esc(bayi.nama)}</a>` : x.idBayi ? esc(x.idBayi) : '–')}
-    </table></div><p class="redup kecil" style="margin:8px 0 0">Pemantauan nifas, KB pasca salin, dan menyusui menyusul pada tahap berikutnya.</p></div>` : ''}
+    </table></div></div>` : ''}
+    ${x.status === 'Nifas' && x.tglPersalinan ? kartuNifas(x) : ''}
     ${hamil ? `<div class="kartu"><h2>Pemantauan kehamilan</h2><div class="grid2">
       <div class="angka"><b>${anc.I + anc.II + anc.III}/6</b><span>Periksa ke nakes (TM I ${anc.I}/1 · II ${anc.II}/2 · III ${anc.III}/3)</span></div>
       <div class="angka ${ttd >= 90 ? 'oke' : ''}"><b>${ttd}/90</b><span>TTD diminum selama hamil</span></div></div></div>` : ''}
@@ -1951,7 +1979,7 @@ function formKeluarIbu(id) {
 
 function viewMateriBumil() {
   const blok = (judul, l, warna) => `<div class="kartu"${warna ? ` style="border-left:5px solid ${warna}"` : ''}><h2>${judul}</h2>${l.map(z => `<div class="vaksin"><div class="nm"><b>${z[0]}</b>${z[1] ? `<small>${z[1]}</small>` : ''}</div></div>`).join('')}</div>`;
-  return { judul: 'Edukasi ibu hamil', nav: 'menu', html: `
+  return { judul: 'Edukasi ibu hamil & nifas', nav: 'menu', html: `
     <div class="pesan-info">Bahan edukasi singkat dari buku KIA. Catat topik yang disampaikan di form kunjungan.</div>
     ${blok('Tanda bahaya kehamilan — segera ke bidan/Puskesmas', TANDA_BAHAYA_HAMIL.map(t => [t, '']).concat([['Sakit kepala hebat, pandangan kabur, nyeri ulu hati', 'Dapat menjadi tanda preeklamsia.']]), 'var(--merah)')}
     ${blok('Periksa kehamilan rutin', [
@@ -1966,10 +1994,156 @@ function viewMateriBumil() {
     ${blok('Persiapan persalinan (P4K)', [
       ['Tentukan penolong dan tempat bersalin di fasilitas kesehatan', ''],
       ['Siapkan kendaraan, biaya/JKN, dan calon donor darah', 'Tempel stiker P4K di rumah.']])}
-    ${blok('Setelah melahirkan', [
-      ['Inisiasi menyusu dini (IMD) dan ASI eksklusif 6 bulan', ''],
-      ['Rencanakan KB pasca salin sejak hamil', 'Diskusikan metode dengan bidan.']])}
+    ${blok('Tanda bahaya masa nifas (42 hari) — segera ke bidan/Puskesmas', TANDA_BAHAYA_NIFAS.map(t => [t, '']), 'var(--merah)')}
+    ${blok('Kunjungan nifas oleh bidan', JADWAL_KF.map(k => [k.kode + ': ' + k.teks + ' setelah persalinan', ''])
+      .concat([['Ibu nifas minum vitamin A 2 kapsul', 'Satu kapsul segera setelah melahirkan, satu lagi 24 jam kemudian.']]))}
+    ${blok('ASI eksklusif dan cara menyusui', [
+      ['IMD: bayi diletakkan di dada ibu segera setelah lahir', ''],
+      ['Hanya ASI sampai bayi 6 bulan', 'Tanpa air putih, madu, susu formula, atau makanan lain.'],
+      ['Susui sesering bayi mau, siang dan malam', 'Paling sedikit 8 kali sehari; ASI makin banyak bila sering disusui.'],
+      ['Pelekatan yang benar', 'Mulut bayi terbuka lebar, sebagian besar areola masuk, dagu menempel payudara; puting tidak lecet.']], 'var(--oke)')}
+    ${blok('KB pasca salin', [
+      ['Mulai ber-KB sebelum masa nifas berakhir (42 hari)', 'Kehamilan bisa terjadi sebelum haid pertama kembali.'],
+      ['Pilihan yang aman untuk ibu menyusui', 'IUD, implan, suntik 3 bulanan, pil khusus menyusui, kondom, atau steril.'],
+      ['MAL (metode amenore laktasi)', 'Hanya berlaku bila menyusui eksklusif, belum haid, dan bayi kurang dari 6 bulan.']])}
+    ${blok('Gizi ibu menyusui', [['Makan lebih banyak dan beragam, cukup minum', 'Perbanyak protein hewani, sayur, dan buah; lanjutkan TTD sesuai anjuran bidan.']])}
     <p class="redup kecil">Sumber: Buku Kesehatan Ibu dan Anak (KIA) Kementerian Kesehatan RI.</p>` };
+}
+
+/* ---------- Nifas, KB pasca salin, menyusui (sampai bayi 6 bulan) ---------- */
+const KOL_NIFAS = ['id', 'periode', 'tgl', 'hariPasca', 'usiaBayi', 'sistol', 'diastol', 'stTD', 'bahaya', 'asi', 'masalah', 'edukasi', 'label', 'alasan', 'diubahPada', 'petugas'];
+const KOL_IBU_C = ['id', 'nik', 'kk', 'nama', 'tglLahir', 'suami', 'rt', 'rw', 'dusun', 'posyandu', 'hp', 'gravida', 'para', 'abortus', 'tglPersalinanAkhir', 'hpht', 'hpl',
+  'tb', 'bbPra', 'bukuKIA', 'p4k', 'status', 'tglMasuk', 'tglKeluar', 'usulKeluar', 'usulTanggal', 'tglPersalinan', 'tempatPersalinan', 'penolong', 'caraPersalinan',
+  'kondisiIbu', 'idBayi', 'catatan', 'imd', 'kf1', 'kf2', 'kf3', 'kf4', 'vitANifas', 'kbMetode', 'kbTgl'];
+const hariPasca = x => x.tglPersalinan ? Math.floor((tglKeMs(hariIni()) - tglKeMs(x.tglPersalinan)) / 864e5) : null;
+const kunjunganNifasDi = (id, p) => (S.d.nifasIbu[id] || {})[p] || null;
+const kfX = x => statusKF(x.tglPersalinan, hariIni(), { KF1: x.kf1, KF2: x.kf2, KF3: x.kf3, KF4: x.kf4 });
+function sasaranNifas(pos) {
+  return S.d.ibu.filter(x => x.status === 'Nifas' && x.tglPersalinan && hariPasca(x) <= HARI_PANTAU_PASCA_SALIN && (pos === undefined ? posTerpilih(x) : x.posyandu === pos));
+}
+const kfPerlu = x => kfX(x).filter(k => k.status === 'Jatuh tempo' || k.status === 'Terlewat');
+function nifasMerah() {
+  const P = periodeKini(), P1 = geserPeriode(P, -1);
+  return sasaranNifas().map(x => ({ x, u: kunjunganNifasDi(x.id, P) || kunjunganNifasDi(x.id, P1) })).filter(y => y.u && y.u.label === 'Merah').sort((a, c) => urutNama(a.x, c.x));
+}
+const WARNA_KF = { Sudah: 'Hijau', 'Jatuh tempo': 'Kuning', Terlewat: 'Merah', 'Belum waktunya': 'Abu' };
+const teksPasca = x => { const h = hariPasca(x); return h === null ? '' : h <= 42 ? 'Nifas hari ke-' + h : 'Bayi ' + usiaTeks(usiaBulan(x.tglPersalinan, hariIni())); };
+
+function viewNifas() {
+  if (!S.periodeNifas) S.periodeNifas = periodeKini();
+  const ps = opsiPeriode();
+  if (ps.indexOf(S.periodeNifas) < 0) S.periodeNifas = ps[0];
+  const boleh = bisaUbahPeriode(S.periodeNifas);
+  return { judul: 'Nifas & menyusui', nav: 'menu', html: `
+    ${admin() ? `<div class="grid2"><label class="isian"><span>Periode</span><select data-ubah="periodeNifas">${ps.map(p => `<option value="${p}" ${p === S.periodeNifas ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>${pilihPosyandu()}</div>`
+      : `<div class="chips">${ps.map(p => `<button class="chip ${p === S.periodeNifas ? 'aktif' : ''}" data-aksi="periodeNifas" data-p="${p}">${namaPeriode(p)}</button>`).join('')}</div>`}
+    ${boleh.ok ? '' : `<div class="pesan-awas">${esc(boleh.pesan)} Data hanya bisa dilihat.</div>`}
+    <div class="pesan-info">Ibu yang sudah bersalin dipantau sampai bayinya 6 bulan: kunjungan nifas (KF), KB pasca salin, dan ASI eksklusif.</div>
+    <div class="chips" style="flex-wrap:wrap">${[['belum', 'Belum dikunjungi'], ['sudah', 'Sudah dikunjungi'], ['kf', 'KF perlu dicek'], ['semua', 'Semua']].map(f => `<button class="chip ${(S.filterNifas || 'belum') === f[0] ? 'aktif' : ''}" data-aksi="filterNifas" data-f="${f[0]}">${f[1]}</button>`).join('')}</div>
+    <div id="daftarNifas"></div>`, setelah: () => isiDaftarNifas() };
+}
+function isiDaftarNifas() {
+  const el = $('#daftarNifas'); if (!el) return;
+  const p = S.periodeNifas, f = S.filterNifas || 'belum';
+  let list = sasaranNifas().sort(urutNama);
+  const total = list.length, sudah = list.filter(x => kunjunganNifasDi(x.id, p)).length;
+  if (f === 'belum') list = list.filter(x => !kunjunganNifasDi(x.id, p));
+  if (f === 'sudah') list = list.filter(x => kunjunganNifasDi(x.id, p));
+  if (f === 'kf') list = list.filter(x => kfPerlu(x).length);
+  el.innerHTML = `<p class="redup kecil" style="margin:0 4px 8px">${sudah} dari ${total} sudah dikunjungi · ${list.length} ditampilkan</p>` + (list.length ? `<div class="daftar">${list.map(x => {
+    const u = kunjunganNifasDi(x.id, p), kf = kfX(x), b = x.idBayi ? S.d.byId[x.idBayi] : null;
+    return `<button class="item" data-aksi="formNifas" data-id="${esc(x.id)}">
+      <span class="avatar P">${esc(inisial(x.nama))}</span>
+      <span class="isi"><div class="nama">${esc(x.nama)}${x._lokal ? ' ⏳' : ''}</div><div class="sub">${teksPasca(x)}${b ? ' · ' + esc(b.nama) : ''} · ${rtRw(x)}</div>
+      <div class="sub">${kf.map(k => `<span class="lbl ${WARNA_KF[k.status]}" style="padding:1px 6px;font-size:.7rem">${k.kode}</span>`).join(' ')}${x.kbMetode ? ' · KB: ' + esc(x.kbMetode) : ''}</div></span>
+      ${u ? `<span class="lbl ${u.label}">${u.label}</span><span class="centang ${u._lokal ? 'lokal' : 'sudah'}">${ikon(u._lokal ? 'jam' : 'centang', 18)}</span>` : '<span class="centang belum"></span>'}
+    </button>`; }).join('')}</div>` : `<div class="kosong">${f === 'belum' ? 'Semua ibu nifas sudah dikunjungi. Terima kasih!' : 'Tidak ada ibu yang cocok.'}</div>`);
+}
+
+function formNifas(id, periode) {
+  const x = S.d.ibuById[id]; if (!x) return;
+  periode = periode || S.periodeNifas || periodeKini();
+  const u = kunjunganNifasDi(id, periode), boleh = bisaUbahPeriode(periode), dis = boleh.ok ? '' : 'disabled';
+  const tglDef = u ? u.tgl : (periode === periodeKini() ? hariIni() : akhirPeriode(periode));
+  const minTgl = x.tglPersalinan > awalPeriode(periode) ? x.tglPersalinan : awalPeriode(periode);
+  const maxTgl = akhirPeriode(periode) > hariIni() ? hariIni() : akhirPeriode(periode);
+  const chips = (nama, daftar, terpilih, merah) => `<div class="chips" style="flex-wrap:wrap">${daftar.map(t => { const on = String(terpilih || '').split(', ').indexOf(t) >= 0;
+    return `<label class="chip ${on ? 'aktif' : ''}"${merah ? ' style="border-color:#f7c9c4"' : ''}><input type="checkbox" name="${nama}" value="${t}" ${on ? 'checked' : ''} ${dis} style="display:none" onchange="this.parentNode.classList.toggle('aktif',this.checked)">${t}</label>`; }).join('')}</div>`;
+  const yt = (nama, v) => `<select name="${nama}" ${dis}><option value="">–</option><option value="Y" ${v === 'Y' ? 'selected' : ''}>Ya</option><option value="T" ${v === 'T' ? 'selected' : ''}>Tidak</option></select>`;
+  const usiaBayi = usiaBulan(x.tglPersalinan, tglDef);
+  bukaLembar(`
+    <h3>${esc(x.nama)}</h3>
+    <div class="redup kecil" style="margin-bottom:12px">${teksPasca(x)} · bersalin ${fmtTgl(x.tglPersalinan)} · ${namaPeriode(periode)}</div>
+    ${boleh.ok ? '' : `<div class="pesan-awas">${esc(boleh.pesan)}</div>`}
+    ${u ? `<div class="pesan-info">Kunjungan ${namaPeriode(periode)} sudah ada${u._lokal ? ' (belum terkirim)' : ''}. Ubah lalu tekan Perbarui.</div>` : ''}
+    <form id="fNifas" data-id="${esc(id)}" data-periode="${periode}">
+      <label class="isian"><span>Tanggal kunjungan</span><input type="date" name="tgl" value="${tglDef}" min="${minTgl}" max="${maxTgl}" required ${dis}></label>
+      <div class="isian"><span style="color:var(--merah)">Tanda bahaya nifas (centang bila ada)</span>${chips('bahaya', TANDA_BAHAYA_NIFAS, u ? u.bahaya : '', true)}</div>
+      <div class="grid2">
+        <label class="isian"><span>Sistol</span><div class="isian-angka"><input name="sistol" inputmode="numeric" value="${u && +u.sistol ? u.sistol : ''}" placeholder="110" ${dis}><em>mmHg</em></div></label>
+        <label class="isian"><span>Diastol</span><div class="isian-angka"><input name="diastol" inputmode="numeric" value="${u && +u.diastol ? u.diastol : ''}" placeholder="70" ${dis}><em>mmHg</em></div></label>
+      </div>
+      <div class="judul-sub" style="margin-top:4px">Menyusui</div>
+      <label class="isian"><span>Bayi bulan ini diberi (usia ${usiaTeks(usiaBayi)})</span><select name="asi" ${dis}><option value="">–</option>${STATUS_ASI.map(t => `<option ${u && u.asi === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <div class="isian"><span class="redup kecil" style="display:block;margin-bottom:6px;font-weight:550">Masalah menyusui</span>${chips('masalah', MASALAH_MENYUSUI, u ? u.masalah : '')}</div>
+      <div class="judul-sub">Dari buku KIA</div>
+      <div class="grid2">${JADWAL_KF.map(k => `<label class="isian"><span>${k.kode} (${k.teks})</span><input type="date" name="${k.kode.toLowerCase()}" value="${x[k.kode.toLowerCase()] || ''}" min="${x.tglPersalinan}" max="${hariIni()}" ${dis}></label>`).join('')}</div>
+      <div class="grid2">
+        <label class="isian"><span>Vitamin A nifas (2 kapsul)</span>${yt('vitANifas', x.vitANifas)}</label>
+        <label class="isian"><span>IMD saat lahir</span>${yt('imd', x.imd)}</label>
+      </div>
+      <div class="judul-sub">KB pasca salin</div>
+      <div class="grid2">
+        <label class="isian"><span>Metode</span><select name="kbMetode" ${dis}><option value="">–</option>${METODE_KB.map(t => `<option ${x.kbMetode === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        <label class="isian"><span>Mulai ber-KB</span><input type="date" name="kbTgl" value="${x.kbTgl || ''}" min="${x.tglPersalinan}" max="${hariIni()}" ${dis}></label>
+      </div>
+      <div class="isian"><span class="redup kecil" style="display:block;margin-bottom:6px;font-weight:550">Edukasi yang diberikan</span>${chips('edu', EDUKASI_NIFAS, u ? u.edukasi : '')}
+        <a href="#/materi-bumil" class="kecil">Lihat bahan edukasi nifas & menyusui</a></div>
+      <div id="galatNifas"></div>
+      ${boleh.ok ? `<button class="tombol penuh" type="submit">${u ? 'Perbarui' : 'Simpan'}</button>
+      <div class="deret-tombol" style="margin-top:10px"><button type="button" class="tombol garis" data-aksi="tutup">Batal</button>
+        <button type="button" class="tombol garis" data-aksi="ke" data-ke="bumil-profil/${esc(id)}">Profil</button></div>`
+      : `<div class="deret-tombol"><button type="button" class="tombol garis" data-aksi="tutup">Tutup</button></div>`}
+    </form>`);
+}
+
+async function simpanNifasForm(f) {
+  const id = f.dataset.id, periode = f.dataset.periode, x0 = S.d.ibuById[id];
+  const ambil = n => Array.from(f.querySelectorAll(`input[name=${n}]:checked`)).map(i => i.value).join(', ');
+  const s = bacaAngka(f.sistol.value), d = bacaAngka(f.diastol.value);
+  const x = { id, periode, tgl: f.tgl.value, bahaya: ambil('bahaya'), masalah: ambil('masalah'), edukasi: ambil('edu'), asi: f.asi.value,
+    kf1: f.kf1.value, kf2: f.kf2.value, kf3: f.kf3.value, kf4: f.kf4.value, vitANifas: f.vitANifas.value, imd: f.imd.value, kbMetode: f.kbMetode.value, kbTgl: f.kbTgl.value,
+    sistol: s === '' || Number.isNaN(s) ? 0 : s, diastol: d === '' || Number.isNaN(d) ? 0 : d };
+  const err = !x.tgl || periodeDari(x.tgl) !== periode ? 'Tanggal kunjungan harus di dalam periode ' + namaPeriode(periode) + '.'
+    : x.tgl < x0.tglPersalinan ? 'Tanggal kunjungan sebelum persalinan.' : Number.isNaN(s) || Number.isNaN(d) ? 'Tekanan darah harus berupa angka.'
+    : (x.sistol > 0) !== (x.diastol > 0) ? 'Isi tekanan darah lengkap: sistol dan diastol.' : x.sistol && (x.sistol <= x.diastol || x.sistol > 260 || x.sistol < 60) ? 'Tekanan darah tidak wajar.' : '';
+  if (err) { $('#galatNifas').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
+  if (x.bahaya && !await konfirmasi('Ada tanda bahaya nifas', 'Minta ibu <b>segera ke bidan atau Puskesmas</b>. Data ini juga dilaporkan ke admin desa.', 'Simpan & laporkan', true)) return;
+  await antrekan('simpanKunjunganNifas', x, 'Kunjungan nifas ' + x0.nama + ' (' + namaPeriode(periode) + ')');
+  const u = kunjunganNifasDi(id, periode), xi = S.d.ibuById[id], kf = kfX(xi);
+  bukaLembar(`<h3>${esc(xi.nama)}</h3><div class="redup kecil" style="margin-bottom:12px">Tersimpan ${S.online ? '' : '(akan dikirim saat ada sinyal)'} · ${teksPasca(xi)}</div>
+    <div class="hasil ${u.label}"><div class="baris antara"><b>${u.label === 'Merah' ? 'Perlu rujukan' : u.label === 'Kuning' ? 'Waspada' : 'Baik'}</b><span class="lbl ${u.label}">${u.label}</span></div>
+      ${u.alasan ? `<ul>${u.alasan.split('; ').map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '<div class="kecil">Tidak ada temuan pada kunjungan ini.</div>'}</div>
+    <div class="deret-tombol" style="margin:10px 0">${kf.map(k => `<span class="lbl ${WARNA_KF[k.status]}">${k.kode}: ${k.status}</span>`).join(' ')}</div>
+    <p class="kecil">ASI: ${esc(u.asi || '–')} · KB: ${esc(xi.kbMetode || '–')}${u.edukasi ? ' · Edukasi: ' + esc(u.edukasi) : ''}</p>
+    <p class="redup kecil">Penanda dini, bukan diagnosis. Kunjungan nifas (KF) oleh bidan; kader mengingatkan dan memantau.</p>
+    <button class="tombol garis penuh" data-aksi="tutupRender">Selesai</button>`);
+}
+
+function kartuNifas(x) {
+  const kf = kfX(x), rows = Object.values(S.d.nifasIbu[x.id] || {}).sort((a, c) => (a.periode < c.periode ? 1 : -1));
+  const yt = v => v === 'Y' ? 'Ya' : v === 'T' ? 'Tidak' : '–';
+  return `<div class="kartu"><div class="baris antara"><h2 style="margin:0">Nifas & menyusui</h2>
+      ${hariPasca(x) <= HARI_PANTAU_PASCA_SALIN ? `<button class="tombol garis kecil" data-aksi="formNifasP" data-id="${esc(x.id)}" data-p="${periodeKini()}">Kunjungan</button>` : ''}</div>
+    <p class="redup kecil" style="margin:6px 0 10px">${teksPasca(x)}</p>
+    ${kf.map(k => `<div class="vaksin"><div class="nm">${k.kode} <small>${k.teks} setelah persalinan${k.tgl ? ' · ' + fmtTgl(k.tgl) : ''}</small></div><span class="lbl ${WARNA_KF[k.status]}">${k.status}</span></div>`).join('')}
+    <div class="tabel-wrap"><table style="margin-top:8px">
+      <tr><td class="redup">IMD / Vitamin A nifas</td><td>${yt(x.imd)} / ${yt(x.vitANifas)}</td></tr>
+      <tr><td class="redup">KB pasca salin</td><td>${esc(x.kbMetode || '–')}${x.kbTgl ? ' · mulai ' + fmtTgl(x.kbTgl) : ''}</td></tr>
+    </table></div>
+    ${rows.length ? `<div class="tabel-wrap"><table style="margin-top:8px"><tr><th>Bulan</th><th>Bayi</th><th>ASI</th><th>Label</th></tr>
+      ${rows.map(r => `<tr class="bisa-ketuk" data-aksi="formNifasP" data-id="${esc(x.id)}" data-p="${r.periode}"><td>${namaPeriode(r.periode).slice(0, 3)} ${r.periode.slice(2, 4)}${r._lokal ? ' ⏳' : ''}</td>
+        <td>${r.usiaBayi === '' ? '–' : r.usiaBayi + ' bln'}</td><td>${esc(r.asi || '–')}</td><td><span class="lbl ${r.label}">${r.label}</span></td></tr>`).join('')}</table></div>` : '<div class="redup" style="margin-top:8px">Belum ada kunjungan nifas.</div>'}</div>`;
 }
 
 /* ---------- Imunisasi ---------- */
@@ -2019,6 +2193,10 @@ function viewRisiko() {
       <span class="avatar P">${esc(inisial(y.x.nama))}</span><span class="isi"><div class="nama">${esc(y.x.nama)}</div>
       <div class="sub dua">${esc(y.u.alasan)}</div><div class="sub">${y.u.uk === '' ? '' : y.u.uk + ' mg · '}${rtRw(y.x)}${y.x.hp ? ' · ' + esc(y.x.hp) : ''}${admin() && !S.pos ? ' · ' + esc(y.x.posyandu) : ''}</div></span>
       <span class="lbl Merah">Merah</span></button>`).join('')}</div>` : ''; })()}
+    ${(() => { const l = nifasMerah(); return l.length ? `<div class="judul-bagian" style="color:var(--merah)">Ibu nifas — perlu rujukan (${l.length})</div><div class="daftar">${l.map(y => `<button class="item" data-aksi="ke" data-ke="bumil-profil/${esc(y.x.id)}">
+      <span class="avatar P">${esc(inisial(y.x.nama))}</span><span class="isi"><div class="nama">${esc(y.x.nama)}</div>
+      <div class="sub dua">${esc(y.u.alasan)}</div><div class="sub">${teksPasca(y.x)} · ${rtRw(y.x)}${y.x.hp ? ' · ' + esc(y.x.hp) : ''}${admin() && !S.pos ? ' · ' + esc(y.x.posyandu) : ''}</div></span>
+      <span class="lbl Merah">Merah</span></button>`).join('')}</div>` : ''; })()}
     ${(() => { const l = lansiaPerluSkrining(); return l.length ? `<div class="judul-bagian">Lansia — temuan skrining (${l.length})</div><div class="daftar">${l.map(x => `<button class="item" data-aksi="ke" data-ke="lansia-profil/${esc(x.l.id)}">
       <span class="avatar ${x.l.jk}">${esc(inisial(x.l.nama))}</span><span class="isi"><div class="nama">${esc(x.l.nama)}</div>
       <div class="sub dua">${esc(x.s.temuan)}</div><div class="sub">${usiaTh(x.l.tglLahir)} th · ${rtRw(x.l)} · skrining ${fmtTgl(x.s.tgl)}${admin() && !S.pos ? ' · ' + esc(x.l.posyandu) : ''}</div></span>
@@ -2053,9 +2231,10 @@ function viewMenu() {
       ${item('tambah-balita', 'Tambah balita', 'Bayi lahir, pindah datang, baru terdata', '', 'bayi')}
       ${item('materi-mpasi', 'Edukasi MP-ASI', 'Bahan MP-ASI kaya protein hewani', '', 'buku', 'hijau')}
     </div>
-    <div class="judul-sub">Ibu hamil</div>
+    <div class="judul-sub">Ibu hamil & nifas</div>
     <div class="daftar">
       ${item('bumil', 'Kunjungan ibu hamil', 'Daftar & kunjungan bulanan', '', 'nadi', 'merah')}
+      ${item('nifas', 'Nifas & menyusui', 'Kunjungan nifas, KB pasca salin, ASI eksklusif', '', 'bayi', 'tosca')}
       ${item('tambah-bumil', 'Tambah ibu hamil', 'Ibu hamil baru terdata', '', 'tambah', 'ungu')}
       ${item('materi-bumil', 'Edukasi ibu hamil', 'Tanda bahaya, TTD, gizi, P4K', '', 'buku', 'oranye')}
     </div>
@@ -2231,6 +2410,14 @@ function viewDashboard() {
         <div class="angka"><b>${d.ibu.ANC}/${d.ibu.D}</b><span>Periksa ke nakes bulan ini</span></div>
         <div class="angka"><b>${d.ibu.TTD_Rutin}/${d.ibu.D}</b><span>Minum TTD rutin</span></div>
         <div class="angka"><b>${d.ibu.Persalinan}</b><span>Persalinan bulan ini · ${d.ibu.Faskes} di faskes</span></div>
+      </div>
+      <div class="judul-sub">Nifas, KB & menyusui</div>
+      <div class="statistik">
+        <div class="angka"><b>${d.ibu.Nifas_D || 0}/${d.ibu.Nifas_S || 0}</b><span>Ibu pasca salin dikunjungi</span></div>
+        <div class="angka ${d.ibu.Nifas_Merah ? 'merah' : ''}"><b>${d.ibu.Nifas_Merah || 0}</b><span>Nifas perlu rujukan</span></div>
+        <div class="angka"><b>${d.ibu.KF_Lengkap || 0}/${d.ibu.KF_Sasaran || 0}</b><span>KF1–KF4 lengkap</span></div>
+        <div class="angka"><b>${d.ibu.KB || 0}/${d.ibu.KB_Sasaran || 0}</b><span>KB pasca salin</span></div>
+        <div class="angka"><b>${d.ibu.ASI_Eks || 0}/${d.ibu.ASI_Sasaran || 0}</b><span>ASI eksklusif (bayi &lt; 6 bln)</span></div>
       </div>` : ''}
       ${d.lansia ? `<div class="judul-sub">Lansia</div>
       <div class="statistik">
@@ -2439,7 +2626,7 @@ const VIEWS = {
   beranda: viewBeranda, ukur: viewUkur, imunisasi: viewImunisasi, risiko: viewRisiko, menu: viewMenu, balita: viewBalita, antrean: viewAntrean,
   'data-balita': viewDataBalita, 'tambah-balita': () => viewFormBalita(''), 'ubah-balita': viewFormBalita, dashboard: viewDashboard, pantau: viewPantau, belum: viewBelum,
   lansia: viewLansia, 'lansia-profil': viewProfilLansia, 'materi-lansia': viewMateriLansia, 'materi-mpasi': viewMateriMPASI,
-  bumil: viewBumil, 'bumil-profil': viewProfilIbu, 'tambah-bumil': () => viewFormIbu(''), 'ubah-bumil': viewFormIbu, 'materi-bumil': viewMateriBumil, 'tambah-lansia': () => viewFormLansia(''), 'ubah-lansia': viewFormLansia,
+  bumil: viewBumil, 'bumil-profil': viewProfilIbu, 'tambah-bumil': () => viewFormIbu(''), 'ubah-bumil': viewFormIbu, 'materi-bumil': viewMateriBumil, nifas: viewNifas, 'tambah-lansia': () => viewFormLansia(''), 'ubah-lansia': viewFormLansia,
   persetujuan: viewPersetujuan, laporan: viewLaporan, pengguna: viewPengguna, kunci: viewKunci, akun: viewAkun
 };
 
@@ -2479,6 +2666,10 @@ const AKSI = {
   formPeriksaB: el => formPeriksaBumil(el.dataset.id, S.periodeIbu || periodeKini()),
   formPeriksaBP: el => formPeriksaBumil(el.dataset.id, el.dataset.p),
   persalinan: el => formPersalinan(el.dataset.id),
+  periodeNifas: el => { S.periodeNifas = el.dataset.p; render(); },
+  filterNifas: el => { S.filterNifas = el.dataset.f; render(); },
+  formNifas: el => formNifas(el.dataset.id, S.periodeNifas || periodeKini()),
+  formNifasP: el => formNifas(el.dataset.id, el.dataset.p),
   keluarIbu: el => formKeluarIbu(el.dataset.id),
   hapusPeriksaB: async () => {
     const f = $('#fPeriksaB'), x = S.d.ibuById[f.dataset.id];
@@ -2643,6 +2834,7 @@ const KIRIM = {
   fPeriksaL: f => simpanPeriksaL(f),
   fPeriksaB: f => simpanPeriksaBumilForm(f),
   fIbu: f => simpanIbuForm(f),
+  fNifas: f => simpanNifasForm(f),
   fPersalinan: async f => {
     const x0 = S.d.ibuById[f.dataset.id];
     if (!f.tempat.value || !f.penolong.value || !f.cara.value || !f.kondisiIbu.value) { $('#galatSalin').innerHTML = '<div class="pesan-galat">Lengkapi tempat, penolong, cara, dan kondisi ibu.</div>'; return; }

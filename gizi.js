@@ -400,6 +400,41 @@ function validasiBumil(d) {
   return '';
 }
 
+/* ---------- Nifas, KB pasca salin, menyusui (buku KIA) ----------
+   Kunjungan nifas oleh nakes: KF1 6 jam–2 hari, KF2 3–7 hari, KF3 8–28 hari, KF4 29–42 hari setelah persalinan.
+   ASI eksklusif: hanya ASI sampai bayi 6 bulan. Pemantauan pasca salin di aplikasi: sampai bayi 6 bulan. */
+var JADWAL_KF = [{ kode: 'KF1', dari: 0, sampai: 2, teks: '6 jam–2 hari' }, { kode: 'KF2', dari: 3, sampai: 7, teks: '3–7 hari' },
+  { kode: 'KF3', dari: 8, sampai: 28, teks: '8–28 hari' }, { kode: 'KF4', dari: 29, sampai: 42, teks: '29–42 hari' }];
+var TANDA_BAHAYA_NIFAS = ['Perdarahan banyak dari jalan lahir', 'Demam', 'Payudara bengkak, merah, atau nyeri', 'Keluar cairan berbau dari jalan lahir',
+  'Bengkak wajah/tangan/kaki dengan sakit kepala atau kejang', 'Sedih berlebihan atau tidak mau mengurus bayi'];
+var MASALAH_MENYUSUI = ['Puting lecet', 'Payudara bengkak', 'ASI dirasa kurang', 'Bayi sulit menyusu'];
+var STATUS_ASI = ['Hanya ASI', 'ASI + makanan/minuman lain', 'Tidak ASI'];
+var METODE_KB = ['IUD', 'Implan', 'Suntik', 'Pil', 'MAL (menyusui)', 'Kondom', 'Steril (MOW/MOP)', 'Belum ber-KB', 'Tidak ingin ber-KB'];
+var EDUKASI_NIFAS = ['Tanda bahaya nifas', 'ASI eksklusif', 'Cara menyusui yang benar', 'KB pasca salin', 'Gizi ibu menyusui', 'Perawatan bayi baru lahir'];
+var HARI_PANTAU_PASCA_SALIN = 183;
+function sudahBerKB(m) { return !!m && m !== 'Belum ber-KB' && m !== 'Tidak ingin ber-KB'; }
+/* Status tiap KF: Sudah / Jatuh tempo / Terlewat / Belum waktunya. tgl = {KF1:'yyyy-mm-dd', ...} */
+function statusKF(tglPersalinan, hariIni, tgl) {
+  var hari = Math.floor((tglKeMs(hariIni) - tglKeMs(tglPersalinan)) / 864e5);
+  return JADWAL_KF.map(function (k) {
+    var st = tgl[k.kode] ? 'Sudah' : hari > k.sampai ? 'Terlewat' : hari >= k.dari ? 'Jatuh tempo' : 'Belum waktunya';
+    return { kode: k.kode, teks: k.teks, tgl: tgl[k.kode] || '', status: st };
+  });
+}
+/* d = {sistol, diastol, bahaya, asi, usiaBayiBln, masalah, kb, hariPasca} */
+function hitungNifas(d) {
+  var merah = [], kuning = [], s = +d.sistol || 0, di = +d.diastol || 0;
+  var stTD = s > 0 && di > 0 ? (s >= 160 || di >= 110 ? 'Hipertensi berat' : s >= 140 || di >= 90 ? 'Hipertensi' : 'Normal') : '';
+  var bahaya = String(d.bahaya || '').split(', ').filter(Boolean);
+  if (bahaya.length) merah.push('Tanda bahaya nifas: ' + bahaya.join(', ').toLowerCase() + ' — rujuk segera');
+  if (stTD === 'Hipertensi berat' || stTD === 'Hipertensi') merah.push('Tekanan darah tinggi (' + s + '/' + di + ') — rujuk');
+  if (d.asi && d.asi !== 'Hanya ASI' && +d.usiaBayiBln < 6) kuning.push('Bayi < 6 bulan tidak ASI eksklusif (' + d.asi.toLowerCase() + ')');
+  var masalah = String(d.masalah || '').split(', ').filter(Boolean);
+  if (masalah.length) kuning.push('Masalah menyusui: ' + masalah.join(', ').toLowerCase());
+  if (+d.hariPasca > 42 && !sudahBerKB(d.kb)) kuning.push('Belum ber-KB setelah masa nifas');
+  return { stTD: stTD, label: merah.length ? 'Merah' : kuning.length ? 'Kuning' : 'Hijau', alasan: merah.concat(kuning) };
+}
+
 /* Agar bisa dipakai di Node (uji) tanpa mengganggu Apps Script/browser */
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { hitungGizi: hitungGizi, hitungNT: hitungNT, hitungLabel: hitungLabel, skorRisiko: skorRisiko,
@@ -407,5 +442,5 @@ if (typeof module !== 'undefined' && module.exports) {
     periodeVitA: periodeVitA, geserPeriode: geserPeriode, akhirPeriode: akhirPeriode, usiaBulan: usiaBulan,
     usiaKPSP: usiaKPSP, hasilKPSP: hasilKPSP, hitungLansia: hitungLansia, validasiLansia: validasiLansia,
     hitungSkrining: hitungSkrining, validasiSkrining: validasiSkrining, hitungBumil: hitungBumil, risikoIbu: risikoIbu,
-    hplDari: hplDari, usiaKehamilan: usiaKehamilan, trimester: trimester };
+    hplDari: hplDari, usiaKehamilan: usiaKehamilan, trimester: trimester, statusKF: statusKF, hitungNifas: hitungNifas };
 }
