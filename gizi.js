@@ -276,6 +276,8 @@ function hitungLansia(p) {
   if (stIMT === 'Obesitas') kuning.push('IMT obesitas (' + String(imt).replace('.', ',') + ')');
   if (stLP === 'Obesitas sentral') kuning.push('Lingkar perut berlebih (' + String(lp).replace('.', ',') + ' cm)');
   if (p.merokok === 'Y') kuning.push('Merokok');
+  if (+p.lila > 0 && +p.lila < 23.5) kuning.push('LiLA kurang dari 23,5 cm (' + String(p.lila).replace('.', ',') + ' cm), risiko kurang gizi');
+  if (p.tbcBatuk === 'Y' || p.tbcDemam === 'Y' || p.tbcKontak === 'Y') kuning.push('Ada gejala atau kontak TBC — rujuk untuk pemeriksaan TBC');
   var riw = [];
   if (p.riwayatHT === 'Y') riw.push('hipertensi');
   if (p.riwayatDM === 'Y') riw.push('diabetes');
@@ -314,7 +316,66 @@ var RANAH_SKILAS = [
 function kategoriAKS(s) { if (s === '' || s === null || s === undefined) return ''; s = +s; return s >= 20 ? 'Mandiri' : s >= 12 ? 'Ketergantungan ringan' : s >= 9 ? 'Ketergantungan sedang' : s >= 5 ? 'Ketergantungan berat' : 'Ketergantungan total'; }
 function kategoriGDS(s) { if (s === '' || s === null || s === undefined) return ''; s = +s; return s <= 4 ? 'Normal' : s <= 8 ? 'Depresi ringan' : s <= 11 ? 'Depresi sedang' : 'Depresi berat'; }
 function kategoriAMT(s) { if (s === '' || s === null || s === undefined) return ''; s = +s; return s >= 8 ? 'Normal' : s >= 4 ? 'Gangguan kognitif sedang' : 'Gangguan kognitif berat'; }
-/* d = {kognitif.., aks, gds, amt}. Hasil: kategori + daftar temuan + perlu rujuk */
+/* Butir rinci sesuai Kartu Bantu Pemeriksaan Lansia (V5). Jawaban Y/T persis seperti pertanyaan di kartu;
+   `masalah` = jawaban yang berarti ada temuan (pertanyaan "dapat/bisa" bermasalah bila T). */
+var BUTIR_SKILAS = [
+  { kode: 'skOrientasi', ranah: 'kognitif', nama: 'Menjawab orientasi waktu dan tempat dengan benar?', masalah: 'T' },
+  { kode: 'skKata', ranah: 'kognitif', nama: 'Dapat mengulang ketiga kata?', masalah: 'T' },
+  { kode: 'skBerdiri', ranah: 'mobilitas', nama: 'Tes berdiri dari kursi: dapat berdiri 5 kali tanpa bantuan tangan dalam 14 detik?', masalah: 'T' },
+  { kode: 'skBB', ranah: 'malnutrisi', nama: 'BB berkurang > 3 kg dalam 3 bulan terakhir atau pakaian jadi lebih longgar?', masalah: 'Y' },
+  { kode: 'skNafsu', ranah: 'malnutrisi', nama: 'Hilang nafsu makan atau kesulitan makan?', masalah: 'Y' },
+  { kode: 'skLila', ranah: 'malnutrisi', nama: 'LiLA kurang dari 23,5 cm?', masalah: 'Y' },
+  { kode: 'skMata', ranah: 'penglihatan', nama: 'Ada masalah pada mata (sulit melihat jauh, membaca, penyakit mata, sedang diobati hipertensi/diabetes)?', masalah: 'Y' },
+  { kode: 'skLihat', ranah: 'penglihatan', nama: 'Tes melihat: dapat melihat dengan jelas?', masalah: 'T' },
+  { kode: 'skBisik', ranah: 'pendengaran', nama: 'Tes berbisik: dapat mendengar bisikan?', masalah: 'T' },
+  { kode: 'skSedih', ranah: 'depresi', nama: 'Dua minggu terakhir merasa sedih, tertekan, atau putus asa?', masalah: 'Y' },
+  { kode: 'skMinat', ranah: 'depresi', nama: 'Dua minggu terakhir sedikit minat atau kesenangan melakukan sesuatu?', masalah: 'Y' }
+];
+/* AKS (indeks Barthel) per butir; jumlah semua butir = skor AKS 0–20 */
+var BUTIR_AKS = [
+  { kode: 'aksBab', nama: 'Mengendalikan buang air besar (BAB)', pilihan: ['Tidak terkendali/tak teratur (perlu pencahar)', 'Kadang-kadang tak terkendali (1x seminggu)', 'Terkendali teratur'] },
+  { kode: 'aksBak', nama: 'Mengendalikan buang air kecil (BAK)', pilihan: ['Tidak terkendali atau pakai kateter', 'Kadang-kadang tak terkendali (1x/24 jam)', 'Mandiri'] },
+  { kode: 'aksDiri', nama: 'Membersihkan diri (cuci wajah, sisir, cukur, sikat gigi)', pilihan: ['Butuh pertolongan orang lain', 'Mandiri'] },
+  { kode: 'aksWc', nama: 'Penggunaan WC (keluar masuk, celana, cebok, menyiram)', pilihan: ['Tergantung pertolongan orang lain', 'Perlu pertolongan pada beberapa kegiatan', 'Mandiri'] },
+  { kode: 'aksMakan', nama: 'Makan minum', pilihan: ['Tidak mampu', 'Perlu ditolong memotong makanan', 'Mandiri'] },
+  { kode: 'aksPindah', nama: 'Bergerak dari kursi roda ke tempat tidur dan sebaliknya', pilihan: ['Tidak mampu', 'Perlu bantuan untuk bisa duduk (2 orang)', 'Bantuan minimal 1 orang', 'Mandiri'] },
+  { kode: 'aksJalan', nama: 'Berjalan di tempat rata (atau menjalankan kursi roda)', pilihan: ['Tidak mampu', 'Bisa pindah dengan kursi roda', 'Berjalan dengan bantuan 1 orang', 'Mandiri'] },
+  { kode: 'aksPakai', nama: 'Berpakaian (termasuk tali sepatu, sabuk)', pilihan: ['Tergantung orang lain', 'Sebagian dibantu (mis. mengancing baju)', 'Mandiri'] },
+  { kode: 'aksTangga', nama: 'Naik turun tangga', pilihan: ['Tidak mampu', 'Butuh pertolongan', 'Mandiri'] },
+  { kode: 'aksMandi', nama: 'Mandi', pilihan: ['Tergantung orang lain', 'Mandiri'] }
+];
+/* Skrining PPOK PUMA (usia > 40 tahun, tahunan). Jenis kelamin dan usia dihitung otomatis. Skor >= 6: curiga PPOK, rujuk. */
+var BUTIR_PUMA = [
+  { kode: 'pumaNapas', nama: 'Pernah merasa napas pendek saat berjalan cepat di jalan datar atau sedikit menanjak?' },
+  { kode: 'pumaDahak', nama: 'Mempunyai dahak dari paru atau sulit mengeluarkan dahak saat tidak sedang flu?' },
+  { kode: 'pumaBatuk', nama: 'Batuk walau tidak sedang flu?' },
+  { kode: 'pumaSpiro', nama: 'Pernah diminta tenaga kesehatan memeriksa spirometri atau peakflow meter (meniup alat)?' }
+];
+var PUMA_ROKOK = ['Tidak merokok atau < 20 bungkus-tahun', '20–30 bungkus-tahun', '> 30 bungkus-tahun'];
+var BATAS_PUMA = 6;
+/* Tes 6 bulanan: hitung jari (mata) dan berbisik (telinga), kanan dan kiri */
+var TES_INDRA = [{ kode: 'mataKanan', nama: 'Mata kanan' }, { kode: 'mataKiri', nama: 'Mata kiri' },
+                 { kode: 'telingaKanan', nama: 'Telinga kanan' }, { kode: 'telingaKiri', nama: 'Telinga kiri' }];
+var ISIAN_SKRINING_RINCI = ['skOrientasi', 'skKata', 'skBerdiri', 'skBB', 'skNafsu', 'skLila', 'skMata', 'skLihat', 'skBisik', 'skSedih', 'skMinat', 'covid',
+  'aksBab', 'aksBak', 'aksDiri', 'aksWc', 'aksMakan', 'aksPindah', 'aksJalan', 'aksPakai', 'aksTangga', 'aksMandi',
+  'pumaRokok', 'pumaNapas', 'pumaDahak', 'pumaBatuk', 'pumaSpiro', 'skorPUMA', 'mataKanan', 'mataKiri', 'telingaKanan', 'telingaKiri', 'penyuluhan'];
+var kosong_ = function (v) { return v === '' || v === null || v === undefined; };
+/* Lengkapi isian skrining dari butir rinci (mengubah d): ranah SKILAS dari butirnya, skor AKS = jumlah 10 butir bila semua diisi,
+   skor PUMA bila semua butir PUMA diisi. jk = 'L'/'P', usia dalam tahun. */
+function lengkapiSkrining(d, jk, usia) {
+  RANAH_SKILAS.forEach(function (r) {
+    var b = BUTIR_SKILAS.filter(function (x) { return x.ranah === r.kode && (d[x.kode] === 'Y' || d[x.kode] === 'T'); });
+    if (b.length) d[r.kode] = b.some(function (x) { return d[x.kode] === x.masalah; }) ? 'Y' : 'T';
+  });
+  if (BUTIR_AKS.every(function (b) { return !kosong_(d[b.kode]); }))
+    d.aks = BUTIR_AKS.reduce(function (s, b) { return s + (+d[b.kode]); }, 0);
+  d.skorPUMA = '';
+  if (!kosong_(d.pumaRokok) && BUTIR_PUMA.every(function (b) { return d[b.kode] === 'Y' || d[b.kode] === 'T'; }))
+    d.skorPUMA = (jk === 'L' ? 1 : 0) + (usia >= 60 ? 2 : usia >= 50 ? 1 : 0) + (+d.pumaRokok) +
+      BUTIR_PUMA.filter(function (b) { return d[b.kode] === 'Y'; }).length;
+  return d;
+}
+/* d = {kognitif.., aks, gds, amt, skorPUMA, mataKanan..}. Hasil: kategori + daftar temuan + perlu rujuk */
 function hitungSkrining(d) {
   var temuan = [];
   RANAH_SKILAS.forEach(function (r) { if (d[r.kode] === 'Y') temuan.push('SKILAS: ' + r.nama.toLowerCase()); });
@@ -322,13 +383,19 @@ function hitungSkrining(d) {
   if (kA && kA !== 'Mandiri') temuan.push('AKS: ' + kA.toLowerCase());
   if (kG && kG !== 'Normal') temuan.push('GDS: ' + kG.toLowerCase());
   if (kM && kM !== 'Normal') temuan.push('AMT: ' + kM.toLowerCase());
+  if (!kosong_(d.skorPUMA) && +d.skorPUMA >= BATAS_PUMA) temuan.push('PUMA: skor ' + d.skorPUMA + ', curiga PPOK');
+  var indra = TES_INDRA.filter(function (t) { return d[t.kode] === 'Gangguan'; }).map(function (t) { return t.nama.toLowerCase(); });
+  if (indra.length) temuan.push('Tes hitung jari/berbisik: gangguan ' + indra.join(', '));
   return { katAKS: kA, katGDS: kG, katAMT: kM, temuan: temuan, perluRujuk: temuan.length > 0 };
 }
 function validasiSkrining(d) {
   if (!d.tgl || isNaN(tglKeMs(d.tgl))) return 'Tanggal skrining wajib diisi.';
-  var ada = RANAH_SKILAS.some(function (r) { return d[r.kode] === 'Y' || d[r.kode] === 'T'; });
+  var ada = RANAH_SKILAS.some(function (r) { return d[r.kode] === 'Y' || d[r.kode] === 'T'; }) ||
+    ISIAN_SKRINING_RINCI.some(function (k) { return k !== 'penyuluhan' && k !== 'skorPUMA' && !kosong_(d[k]); });
   var cek = function (v, maks) { return v === '' || v === null || v === undefined || (+v >= 0 && +v <= maks && Math.floor(+v) === +v); };
-  if (!ada && d.aks === '' && d.gds === '' && d.amt === '') return 'Isi minimal satu hasil skrining.';
+  if (!ada && kosong_(d.aks) && kosong_(d.gds) && kosong_(d.amt)) return 'Isi minimal satu hasil skrining.';
+  for (var i = 0; i < BUTIR_AKS.length; i++) if (!cek(d[BUTIR_AKS[i].kode], BUTIR_AKS[i].pilihan.length - 1)) return 'Skor AKS "' + BUTIR_AKS[i].nama + '" tidak valid.';
+  if (!cek(d.pumaRokok, 2)) return 'Skor merokok PUMA harus 0, 1, atau 2.';
   if (!cek(d.aks, 20)) return 'Skor AKS harus 0 sampai 20.';
   if (!cek(d.gds, 15)) return 'Skor GDS harus 0 sampai 15.';
   if (!cek(d.amt, 10)) return 'Skor AMT harus 0 sampai 10.';
@@ -341,7 +408,8 @@ var PENYULUHAN_LANSIA = ['Aktivitas fisik', 'Gizi seimbang', 'Berhenti merokok',
 function validasiLansia(d) {
   if (!d.tgl || isNaN(tglKeMs(d.tgl))) return 'Tanggal pemeriksaan wajib diisi.';
   if (periodeDari(d.tgl) !== d.periode) return 'Tanggal pemeriksaan harus di dalam periode ' + namaPeriode(d.periode) + '.';
-  if (!(+d.bb > 0) && !(+d.tb > 0) && !(+d.lp > 0) && !(+d.sistol > 0) && !(+d.diastol > 0) && !(+d.gd > 0) && !(+d.kol > 0) && !(+d.au > 0)) return 'Isi minimal satu hasil pemeriksaan.';
+  if (!(+d.bb > 0) && !(+d.tb > 0) && !(+d.lp > 0) && !(+d.sistol > 0) && !(+d.diastol > 0) && !(+d.gd > 0) && !(+d.kol > 0) && !(+d.au > 0) && !(+d.lila > 0)) return 'Isi minimal satu hasil pemeriksaan.';
+  if (+d.lila && (+d.lila < 10 || +d.lila > 50)) return 'LiLA harus 10 sampai 50 cm.';
   if (+d.gd && (+d.gd < 20 || +d.gd > 600)) return 'Gula darah harus 20 sampai 600 mg/dL.';
   if (+d.kol && (+d.kol < 50 || +d.kol > 500)) return 'Kolesterol harus 50 sampai 500 mg/dL.';
   if (+d.au && (+d.au < 1 || +d.au > 20)) return 'Asam urat harus 1 sampai 20 mg/dL.';

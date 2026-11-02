@@ -341,3 +341,7 @@ html.luar .pesan-awas, html.luar .pesan-galat, html.luar .pesan-info { border: 2
 html.luar .chip { border: 2px solid var(--garis); }
 html.luar .chip.aktif { border-color: var(--utama); }
 html.luar .hero-kartu .label-kecil, html.luar .judul-sub, html.luar .layanan-judul { color: var(--teks); }
+/* Bagian formulir yang bisa dilipat (skrining lansia) */
+.lipat { border: 1px solid var(--garis); border-radius: 14px; padding: 0 12px; margin: 12px 0; background: var(--kartu); }
+.lipat > summary { min-height: 48px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-weight: 700; cursor: pointer; color: var(--teks); }
+.lipat[open] > summary { border-bottom: 1px solid var(--garis); margin-bottom: 8px; }
