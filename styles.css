@@ -345,3 +345,62 @@ html.luar .hero-kartu .label-kecil, html.luar .judul-sub, html.luar .layanan-jud
 .lipat { border: 1px solid var(--garis); border-radius: 14px; padding: 0 12px; margin: 12px 0; background: var(--kartu); }
 .lipat > summary { min-height: 48px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-weight: 700; cursor: pointer; color: var(--teks); }
 .lipat[open] > summary { border-bottom: 1px solid var(--garis); margin-bottom: 8px; }
+
+/* =====================================================================
+   Perapian tampilan v2.7 — skala huruf tetap, tombol minimal 48 px,
+   warna tetap per kelompok sasaran (balita biru, ibu merah muda, lansia hijau)
+   Skala huruf: 13 (keterangan) · 14 (isi kecil) · 16 (isi) · 18 (judul) · 22 (nama) · 32 (angka besar)
+   ===================================================================== */
+.kecil, .item .sub, .pesan-info, .pesan-awas, .pesan-galat, table, .toast, label.isian > span { font-size: .875rem; }
+.angka span, .ubin span, .lalu, .lbl, th, .info-sinkron, .layanan-judul, .status-kirim, .hero-kartu .label-kecil { font-size: .8125rem; }
+.aksi-cepat button, .layanan button { font-size: .8125rem; line-height: 1.25; }
+nav.bawah button { font-size: .8125rem; }
+.kartu h2, .judul-bagian { font-size: 1.125rem; }
+.layanan .bdg, .aksi-cepat .bdg, nav.bawah .bdg { font-size: .72rem; }
+
+/* sasaran sentuh minimal 48 px (aturan proyek) */
+.chip { min-height: 48px; padding: 0 18px; }
+.tombol.kecil { min-height: 48px; padding: 0 16px; font-size: .875rem; }
+.status-kirim { min-height: 44px; }
+
+/* label isian berupa <div> (berisi tombol Ya/Tidak) tampil sama dengan <label> */
+div.isian { margin-bottom: 12px; }
+div.isian > span { display: block; font-size: .875rem; color: var(--teks); margin-bottom: 6px; font-weight: 650; }
+/* dua kolom: kotak isian sejajar walau panjang label berbeda */
+form .grid2, .lembar .grid2 { align-items: end; }
+
+/* Pilihan Ya/Tidak: dua tombol besar berdampingan */
+.segmen { display: flex; gap: 8px; }
+.segmen button { flex: 1 1 0; min-height: 52px; border-radius: 13px; border: 2px solid #c7d0de; background: #fff; color: var(--teks);
+  font-size: 1rem; font-weight: 700; cursor: pointer; }
+.segmen button.pilih { background: var(--utama); border-color: var(--utama); color: #fff; box-shadow: 0 4px 12px rgba(20,104,229,.25); }
+.segmen button[data-seg="T"].pilih, .segmen button[data-seg="Normal"].pilih { background: #4b5568; border-color: #4b5568; box-shadow: none; }
+.segmen button[data-seg="Gangguan"].pilih { background: var(--merah); border-color: var(--merah); }
+.segmen button:disabled { opacity: .55; }
+
+/* Tab di halaman (Risiko: Balita / Ibu / Lansia) */
+.tab-grup { display: flex; gap: 4px; background: #e6ebf3; border-radius: 16px; padding: 4px; margin: 0 0 14px; }
+.tab-grup button { flex: 1 1 0; min-height: 48px; border: 0; border-radius: 12px; background: none; font-size: .95rem; font-weight: 700; color: var(--teks-2);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.tab-grup button.aktif { background: #fff; color: var(--teks); box-shadow: var(--bayang); }
+.tab-grup .jml { background: var(--merah); color: #fff; border-radius: 999px; min-width: 22px; height: 22px; padding: 0 6px; font-size: .75rem; display: inline-grid; place-items: center; }
+
+/* Kartu tugas per kelompok: judul berikon dengan warna kelompok, 3 aksi besar */
+.judul-grup { display: inline-flex; align-items: center; gap: 8px; font-size: .9375rem; font-weight: 700; color: var(--teks); }
+.ik-grup { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; color: #fff; flex: none; }
+.hero-kartu .label-kecil::before { display: none !important; }
+.aksi-cepat.tiga, .layanan.tiga { grid-template-columns: repeat(3, 1fr); }
+.aksi-cepat.tiga .bulat { width: 52px; height: 52px; }
+.hero-kartu.balita { border-top: 4px solid #2f8cff; }
+.hero-kartu.ibu { border-top: 4px solid #ff74a8; }
+.hero-kartu.lansia { border-top: 4px solid #3fd18b; }
+.hero-kartu.lansia .persen { background: var(--oke-bg); color: var(--oke); }
+.item .ik-item.pink { background: var(--merahmuda-bg); color: var(--merahmuda); }
+.judul-grup { font-size: 1.0625rem; line-height: 1.2; }
+.judul-grup .label-kecil { display: block; font-weight: 600; color: var(--teks-2); }
+.hero-kartu .besar { margin-top: 8px; }
+/* pilihan topik di formulir: bergaris agar jelas bisa diketuk */
+form .chip { border: 2px solid #c7d0de; background: #fff; }
+form .chip.aktif { border-color: var(--utama); }
+.lembar .judul-bagian { margin-left: 0; }
+.judul-sub { font-size: .8125rem; }
