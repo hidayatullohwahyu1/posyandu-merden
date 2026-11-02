@@ -1697,8 +1697,13 @@ function skriningTerakhir(id) {
 }
 /* Skrining jatuh tempo: belum ada dalam 12 bulan terakhir */
 const skriningTempo = id => { const t = skriningTerakhir(id); return !t || t.periode < geserPeriode(periodeKini(), -11); };
+/* Skrining 12 bulan terakhir digabung per bagian (sama dengan rekap & laporan server) */
+function skriningGabungHP(id) {
+  const dari = geserPeriode(periodeKini(), -11), l = Object.values(S.d.skriningL[id] || {}).filter(s => s.periode >= dari);
+  return l.length ? gabungSkrining(l) : null;
+}
 function lansiaPerluSkrining() {
-  return sasaranLansia().map(l => ({ l, s: skriningTerakhir(l.id) })).filter(x => x.s && x.s.perluRujuk === 'Y' && x.s.periode >= geserPeriode(periodeKini(), -11))
+  return sasaranLansia().map(l => ({ l, s: skriningGabungHP(l.id) })).filter(x => x.s && x.s.perluRujuk)
     .sort((a, c) => urutNama(a.l, c.l));
 }
 function kartuSkriningL(l) {
@@ -2352,7 +2357,7 @@ function viewRisiko() {
       <span class="lbl Merah">Merah</span></button>`).join('')}</div>` : ''; })()}
     ${(() => { const l = lansiaPerluSkrining(); return l.length ? `<div class="judul-bagian">Lansia — temuan skrining (${l.length})</div><div class="daftar">${l.map(x => `<button class="item" data-aksi="ke" data-ke="lansia-profil/${esc(x.l.id)}">
       <span class="avatar ${x.l.jk}">${esc(inisial(x.l.nama))}</span><span class="isi"><div class="nama">${esc(x.l.nama)}</div>
-      <div class="sub dua">${esc(x.s.temuan)}</div><div class="sub">${usiaTh(x.l.tglLahir)} th · ${rtRw(x.l)} · skrining ${fmtTgl(x.s.tgl)}${admin() && !S.pos ? ' · ' + esc(x.l.posyandu) : ''}</div></span>
+      <div class="sub dua">${esc(x.s.temuan.join('; '))}</div><div class="sub">${usiaTh(x.l.tglLahir)} th · ${rtRw(x.l)} · skrining ${fmtTgl(x.s.tgl)}${admin() && !S.pos ? ' · ' + esc(x.l.posyandu) : ''}</div></span>
       <span class="lbl Kuning">Rujuk</span></button>`).join('')}</div>` : ''; })()}
     ${(() => { const l = lansiaMerah(); return l.length ? `<div class="judul-bagian">Lansia — perlu rujukan (${l.length})</div><div class="daftar">${l.map(x => `<button class="item" data-aksi="ke" data-ke="lansia-profil/${esc(x.l.id)}">
       <span class="avatar ${x.l.jk}">${esc(inisial(x.l.nama))}</span><span class="isi"><div class="nama">${esc(x.l.nama)}</div>

@@ -388,6 +388,25 @@ function hitungSkrining(d) {
   if (indra.length) temuan.push('Tes hitung jari/berbisik: gangguan ' + indra.join(', '));
   return { katAKS: kA, katGDS: kG, katAMT: kM, temuan: temuan, perluRujuk: temuan.length > 0 };
 }
+/* Gabungan skrining terkini satu lansia. Catatan skrining bisa berisi sebagian saja (mis. hanya tes mata/telinga 6 bulanan),
+   jadi tiap bagian (SKILAS, AKS, GDS, AMT, PUMA, tes indra, COVID) diambil dari catatan TERAKHIR yang memuat bagian itu.
+   daftar = catatan {periode, tgl, kognitif.., aks, gds, amt, skorPUMA, mataKanan.., covid} yang sudah disaring jendela waktunya. */
+function gabungSkrining(daftar) {
+  var urut = daftar.slice().sort(function (a, b) { return String(a.periode) < String(b.periode) ? 1 : -1; });
+  var ambil = function (ada) { for (var i = 0; i < urut.length; i++) if (ada(urut[i])) return urut[i]; return null; };
+  var g = { tgl: urut.length ? String(urut[0].tgl) : '', jumlah: urut.length };
+  var sk = ambil(function (s) { return RANAH_SKILAS.some(function (r) { return s[r.kode] === 'Y' || s[r.kode] === 'T'; }); });
+  RANAH_SKILAS.forEach(function (r) { g[r.kode] = sk ? sk[r.kode] : ''; });
+  g.tglSKILAS = sk ? String(sk.tgl) : '';
+  ['aks', 'gds', 'amt', 'skorPUMA'].forEach(function (k) { var s = ambil(function (x) { return !kosong_(x[k]); }); g[k] = s ? +s[k] : ''; });
+  var ind = ambil(function (s) { return TES_INDRA.some(function (t) { return !kosong_(s[t.kode]); }); });
+  TES_INDRA.forEach(function (t) { g[t.kode] = ind ? (ind[t.kode] || '') : ''; });
+  var cv = ambil(function (s) { return s.covid === 'Y' || s.covid === 'T'; });
+  g.covid = cv ? cv.covid : '';
+  var h = hitungSkrining(g);
+  g.katAKS = h.katAKS; g.katGDS = h.katGDS; g.katAMT = h.katAMT; g.temuan = h.temuan; g.perluRujuk = h.perluRujuk;
+  return g;
+}
 function validasiSkrining(d) {
   if (!d.tgl || isNaN(tglKeMs(d.tgl))) return 'Tanggal skrining wajib diisi.';
   var ada = RANAH_SKILAS.some(function (r) { return d[r.kode] === 'Y' || d[r.kode] === 'T'; }) ||
