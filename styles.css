@@ -404,3 +404,8 @@ form .chip { border: 2px solid #c7d0de; background: #fff; }
 form .chip.aktif { border-color: var(--utama); }
 .lembar .judul-bagian { margin-left: 0; }
 .judul-sub { font-size: .8125rem; }
+/* layanan langsung dari layar hasil (imunisasi, vitamin A, rujukan, skrining) */
+.layanan-hasil { background: var(--utama-muda); border-radius: 16px; padding: 12px; margin: 12px 0; }
+.layanan-hasil .judul-kecil { font-size: .875rem; font-weight: 700; margin-bottom: 8px; color: var(--teks); }
+.layanan-hasil .deret-tombol { flex-wrap: wrap; }
+.layanan-hasil .tombol { flex: 1 1 auto; }

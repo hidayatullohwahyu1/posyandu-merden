@@ -162,6 +162,7 @@ window.addEventListener('popstate', () => {
 
 function hapusTirai() { const t = $('#tirai'); if (t) t.remove(); }
 function bukaLembar(html, setelah) {
+  S.dariHasil = null;   // lembar baru: tidak lagi "kembali ke layar hasil" (layananHasil memasangnya lagi sesudah membuka formulir)
   // Lembar diganti lembar lain (mis. hasil -> berikutnya): pakai entri riwayat yang sama
   if ($('#tirai')) hapusTirai(); else pasangLapis(hapusTirai);
   const t = document.createElement('div');
@@ -1023,10 +1024,37 @@ function tampilHasil(b, u) {
       ? `<div class="pesan-info">Usia MP-ASI: sampaikan pentingnya <b>protein hewani setiap hari</b> (telur, ikan, ayam, hati). <a href="#/materi-mpasi">Lihat bahan edukasi</a></div>` : ''; })()}
     ${u.edukasi ? `<p class="kecil">Edukasi: ${esc(u.edukasi)}</p>` : ''}
     ${[u.tbcBatuk, u.tbcDemam, u.tbcKontak].indexOf('Y') >= 0 ? '<div class="pesan-awas">Ada gejala atau kontak TBC: <b>rujuk ke puskesmas atau pustu</b> untuk pemeriksaan TBC, lalu catat di menu Risiko.</div>' : ''}
-    <p class="redup kecil">Status bersifat penanda; penentuan dan penanganan oleh tenaga kesehatan.${u.label === 'Merah' ? ' Sampaikan ke orang tua dan catat rujukan di menu Risiko.' : ''}</p>
+    ${layananHasilBalita(b, u)}
+    <p class="redup kecil">Status bersifat penanda; penentuan dan penanganan oleh tenaga kesehatan.${u.label === 'Merah' ? ' Sampaikan ke orang tua lalu catat rujukannya.' : ''}</p>
     <div class="deret-tombol">
       ${berikut ? `<button class="tombol" data-aksi="formUkur" data-id="${esc(berikut.id)}">Berikutnya: ${esc(berikut.nama.split(' ').slice(0, 2).join(' '))} ${ikon('kanan', 18)}</button>` : ''}
       <button class="tombol garis" data-aksi="tutupRender">Selesai</button></div>`);
+}
+
+/* Langkah 4 posyandu (layanan) dari layar hasil: imunisasi yang jatuh tempo, vitamin A/obat cacing di bulan Februari/Agustus,
+   dan pencatatan rujukan bila merah atau ada gejala TBC. Setelah disimpan, kader kembali ke layar hasil (tombol Berikutnya tetap ada). */
+function layananHasilBalita(b, u) {
+  const P = u.periode, usia = usiaBulan(b.tglLahir, hariIni()), bulanVit = ['02', '08'].indexOf(P.slice(5)) >= 0;
+  // yang jatuh tempo dulu, lalu yang terlambat; paling banyak 3 tombol, sisanya lewat profil anak
+  const semuaImun = statusImun(b).list.filter(x => x.status === 'Jatuh tempo' || x.status === 'Terlambat');
+  const imun = semuaImun.filter(x => x.status === 'Jatuh tempo').concat(semuaImun.filter(x => x.status === 'Terlambat')).slice(0, 3);
+  const vit = bulanVit && ((usia >= 6 && usia < 60 && !vitASudah(b, periodeVitA(P))) || (usia >= 12 && usia < 60 && !ocSudah(b, P)));
+  const rujuk = u.label === 'Merah' || [u.tbcBatuk, u.tbcDemam, u.tbcKontak].indexOf('Y') >= 0;
+  if (!imun.length && !vit && !rujuk) return '';
+  const tbl = (jenis, k, teks, kls) => `<button type="button" class="tombol ${kls || 'garis'} kecil" data-aksi="layananHasil" data-jenis="${jenis}" data-id="${esc(b.id)}" data-k="${esc(k || '')}">${teks}</button>`;
+  return `<div class="layanan-hasil"><div class="judul-kecil">Layanan untuk ${esc(b.nama.split(' ')[0])} hari ini</div><div class="deret-tombol">
+    ${rujuk ? tbl('tl', '', ikon('awas', 18) + ' Catat rujukan', 'bahaya') : ''}
+    ${imun.map(x => tbl('imun', x.kode, ikon('suntik', 18) + ' ' + esc(x.kode) + (x.status === 'Terlambat' ? ' (terlambat)' : ''))).join('')}
+    ${vit ? tbl('vit', '', ikon('kapsul', 18) + ' Vitamin A / obat cacing') : ''}</div>
+    ${semuaImun.length > imun.length ? `<button type="button" class="tombol garis kecil penuh" style="margin-top:8px" data-aksi="ke" data-ke="balita/${esc(b.id)}">${semuaImun.length - imun.length} imunisasi lain belum tercatat — buka profil anak</button>` : ''}</div>`;
+}
+/* Kembali ke layar hasil sesudah mencatat layanan yang dibuka dari layar hasil */
+function kembaliKeHasil(id) {
+  const h = S.dariHasil; S.dariHasil = null;
+  if (!h || (id && h.id !== id)) return false;
+  if (h.kel === 'lansia') { const l = S.d.lansiaById[h.id], u = l && periksaDi(h.id, h.periode); if (!u) return false; render(); tampilHasilL(l, u); return true; }
+  const b = S.d.byId[h.id], u = b && ukurDi(h.id, h.periode); if (!u) return false;
+  render(); tampilHasil(b, u); return true;
 }
 
 /* ---------- Profil balita ---------- */
@@ -1404,11 +1432,12 @@ function isiDaftarLansia() {
   if (f === 'sudah') list = list.filter(l => periksaDi(l.id, p));
   if (f === 'skrining') list = list.filter(l => skriningTempo(l.id));
   if (q) list = list.filter(l => l.nama.toLowerCase().indexOf(q) >= 0 || ('rt ' + l.rt).indexOf(q) >= 0 || rtRw(l).toLowerCase().indexOf(q) >= 0);
-  el.innerHTML = `<p class="redup kecil" style="margin:0 4px 8px">${sudah} dari ${total} sudah diperiksa · ${list.length} ditampilkan</p>` + (list.length ? `<div class="daftar">${list.slice(0, 300).map(l => {
+  el.innerHTML = `<p class="redup kecil" style="margin:0 4px 8px">${f === 'skrining' ? `${list.length} lansia belum diskrining dalam 12 bulan. Ketuk nama untuk mencatat skrining.` : `${sudah} dari ${total} sudah diperiksa · ${list.length} ditampilkan`}</p>` + (list.length ? `<div class="daftar">${list.slice(0, 300).map(l => {
     const u = periksaDi(l.id, p);
-    return `<button class="item" data-aksi="formPeriksaL" data-id="${esc(l.id)}">
+    const sk = f === 'skrining' ? skriningTerakhir(l.id) : null;
+    return `<button class="item" data-aksi="${f === 'skrining' ? 'formSkriningL' : 'formPeriksaL'}" data-id="${esc(l.id)}">
       <span class="avatar ${l.jk}">${esc(inisial(l.nama))}</span>
-      <span class="isi"><div class="nama">${esc(l.nama)}${l._lokal ? ' ⏳' : ''}</div><div class="sub">${usiaTh(l.tglLahir)} th · ${rtRw(l)}${admin() && !S.pos ? ' · ' + esc(l.posyandu) : ''}${u ? ' · TD ' + tdTeks(u) : ''}</div></span>
+      <span class="isi"><div class="nama">${esc(l.nama)}${l._lokal ? ' ⏳' : ''}</div><div class="sub">${usiaTh(l.tglLahir)} th · ${rtRw(l)}${admin() && !S.pos ? ' · ' + esc(l.posyandu) : ''}${f === 'skrining' ? ' · ' + (sk ? 'skrining terakhir ' + fmtTgl(sk.tgl) : 'belum pernah skrining') : u ? ' · TD ' + tdTeks(u) : ''}</div></span>
       ${u ? `<span class="lbl ${u.label}">${u.label}</span><span class="centang ${u._lokal ? 'lokal' : 'sudah'}">${ikon(u._lokal ? 'jam' : 'centang', 18)}</span>` : '<span class="centang belum"></span>'}
     </button>`; }).join('')}</div>` : `<div class="kosong">${f === 'skrining' ? 'Semua lansia sudah diskrining dalam 12 bulan terakhir.' : f === 'belum' && !q ? 'Semua lansia sudah diperiksa. Terima kasih!' : 'Tidak ada lansia yang cocok.'}</div>`);
 }
@@ -1512,6 +1541,8 @@ function tampilHasilL(l, u) {
       ${baris('Gula darah ' + (u.jenisGD === 'Puasa' ? 'puasa' : 'sewaktu'), +u.gd ? u.gd + ' mg/dL' : '', u.stGD)}${baris('Kolesterol', +u.kol ? u.kol + ' mg/dL' : '', u.stKol)}
       ${baris('Asam urat', +u.au ? angka(u.au) + ' mg/dL' : '', u.stAU)}</table>
     ${u.penyuluhan ? `<p class="kecil">Penyuluhan: ${esc(u.penyuluhan)}</p>` : ''}
+    ${skriningTempo(l.id) ? `<div class="layanan-hasil"><div class="judul-kecil">Belum ada skrining dalam 12 bulan</div><div class="deret-tombol">
+      <button type="button" class="tombol garis kecil" data-aksi="layananHasil" data-jenis="skriningL" data-id="${esc(l.id)}" data-p="${p}">${ikon('papan', 18)} Catat skrining tahunan</button></div></div>` : ''}
     <p class="redup kecil">Hasil ini penanda dini, bukan diagnosis. Pemeriksaan dan pengobatan oleh tenaga kesehatan.${u.label === 'Merah' ? ' Sarankan segera ke Puskesmas.' : ''}</p>
     <div class="deret-tombol">
       ${berikut ? `<button class="tombol" data-aksi="formPeriksaL" data-id="${esc(berikut.id)}">Berikutnya: ${esc(berikut.nama.split(' ').slice(0, 2).join(' '))} ${ikon('kanan', 18)}</button>` : ''}
@@ -2793,6 +2824,7 @@ const AKSI = {
     catch (e) { bukaLembar(`<h3>Salin teks</h3><textarea style="min-height:240px">${esc(teks)}</textarea>`); }
   },
   ke: el => {
+    S.dariHasil = null;
     // Dari dalam lembar: ganti entri riwayat lembar, agar Kembali tidak membuka halaman yang sama dua kali
     const dariLembar = lapisan.length && history.state && history.state.lapis;
     tutupLembar(true); lapisan.length = 0;
@@ -2800,7 +2832,13 @@ const AKSI = {
   },
   // Dibuka langsung di halaman turunan (tanpa riwayat di aplikasi): kembali ke Beranda, bukan keluar
   kembali: () => { if (navDalam) history.back(); else location.hash = '#/beranda'; },
-  tutup: () => tutupLembar(),
+  tutup: () => { if (!kembaliKeHasil()) tutupLembar(); },
+  layananHasil: el => {
+    const j = el.dataset.jenis, id = el.dataset.id;
+    const asal = j === 'skriningL' ? { kel: 'lansia', id, periode: el.dataset.p } : { kel: 'balita', id, periode: (Object.values(S.d.ukur[id] || {}).sort((a, c) => a.periode < c.periode ? 1 : -1)[0] || {}).periode };
+    if (j === 'imun') formImun(id, el.dataset.k); else if (j === 'vit') formVit(id); else if (j === 'tl') formTL(id); else formSkriningL(id);
+    S.dariHasil = asal;
+  },
   tutupRender: () => { tutupLembar(); render(); },
   sinkron: async () => { await kirimAntrean(); await sinkron(false); },
   periode: el => { S.periode = el.dataset.p; render(); },
@@ -3010,7 +3048,7 @@ const KIRIM = {
     const w = cekUrutanImun(b, f.dataset.k, f.tgl.value);
     if (w.length && !await konfirmasi('Periksa jadwal imunisasi', w.map(esc).join('<br>') + '<br><br>Tetap catat sesuai buku KIA?', 'Tetap catat')) return;
     await antrekan('simpanImunisasi', { id: f.dataset.id, kode: f.dataset.k, tgl: f.tgl.value, tempat: f.tempat.value }, 'Imunisasi ' + f.dataset.k + ' ' + b.nama);
-    tutupLembar(); render(); toast('Imunisasi tercatat.');
+    if (!kembaliKeHasil(f.dataset.id)) { tutupLembar(); render(); } toast('Imunisasi tercatat.');
   },
   fVit: async f => {
     const b = S.d.byId[f.dataset.id];
@@ -3021,7 +3059,7 @@ const KIRIM = {
     const anjuran = { VitA_Biru: 'kapsul biru untuk 6–11 bulan', VitA_Merah: 'kapsul merah untuk 12–59 bulan', Obat_Cacing: 'obat cacing mulai usia 12 bulan' }[j];
     if (!cocok && !await konfirmasi('Periksa jenis dan usia', `Anak berusia ${usiaTeks(usia)} pada tanggal pemberian, sedangkan anjurannya ${anjuran}. Tetap simpan?`, 'Tetap simpan')) return;
     await antrekan('simpanVitamin', { id: f.dataset.id, jenis: f.jenis.value, tgl: f.tgl.value }, 'Vitamin/obat cacing ' + b.nama);
-    tutupLembar(); render(); toast('Tercatat.');
+    if (!kembaliKeHasil(f.dataset.id)) { tutupLembar(); render(); } toast('Tercatat.');
   },
   fPeriksaL: f => simpanPeriksaL(f),
   fPeriksaB: f => simpanPeriksaBumilForm(f),
@@ -3065,7 +3103,7 @@ const KIRIM = {
     if (err) { $('#galatSkL').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
     await antrekan('simpanSkriningLansia', x, 'Skrining lansia ' + l.nama);
     const h = hitungSkrining(lengkapiSkrining(Object.assign({}, x), l.jk, Math.floor(usiaBulan(l.tglLahir, x.tgl) / 12)));
-    tutupLembar(); render(); toast(h.perluRujuk ? 'Skrining tersimpan: perlu pemeriksaan lanjut di Puskesmas.' : 'Skrining tersimpan: tidak ada temuan.', 5000);
+    if (!kembaliKeHasil(f.dataset.id)) { tutupLembar(); render(); } toast(h.perluRujuk ? 'Skrining tersimpan: perlu pemeriksaan lanjut di Puskesmas.' : 'Skrining tersimpan: tidak ada temuan.', 5000);
   },
   fLansia: f => simpanLansiaForm(f),
   fKeluarL: async f => {
@@ -3101,7 +3139,7 @@ const KIRIM = {
     // Tanggal rujuk hanya bermakna bila tujuan rujukan dipilih
     await antrekan('simpanTindakLanjut', { id: f.dataset.id, idTL: f.dataset.tl, status: f.status.value, tglRujuk: f.dirujukKe.value ? f.tglRujuk.value : '', dirujukKe: f.dirujukKe.value,
       intervensi: iv, hasil: rapiSpasi(f.hasil.value), label: f.dataset.label, alasan: f.dataset.alasan }, 'Tindak lanjut ' + b.nama);
-    tutupLembar(); render(); toast('Tindak lanjut tercatat.');
+    if (!kembaliKeHasil(f.dataset.id)) { tutupLembar(); render(); } toast('Tindak lanjut tercatat.');
   },
   fMutasi: async f => {
     const b = S.d.byId[f.dataset.id];
