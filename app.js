@@ -2719,6 +2719,7 @@ function viewLaporan() {
       <label class="isian"><span>Periode</span><select id="perLap">${ps.map((p, i) => `<option value="${p}" ${i === 1 ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>
       <label class="isian"><span>Kelompok sasaran</span><select id="kelLap"><option value="balita">Balita</option><option value="ibu">Ibu hamil, nifas &amp; menyusui</option><option value="lansia">Lansia</option><option value="">Semua (3 file)</option></select></label>
     </div>
+    <label class="isian"><span>Cakupan</span><select id="posLap"><option value="">Seluruh desa (semua posyandu + TOTAL DESA)</option>${S.d.posyandu.map(p => `<option value="${esc(p)}">Posyandu ${esc(p)} saja</option>`).join('')}</select></label>
     <button class="tombol penuh" data-aksi="buatLaporan">Buat laporan</button>
     <p class="redup kecil">Balita: rekap SKDN, gizi, imunisasi, vitamin A, obat cacing, MP-ASI, KPSP, PD3I. Ibu: ibu hamil, persalinan, nifas, KB, ASI. Lansia: pemeriksaan, skrining, rujukan.
       Robot membuat ketiganya setiap tanggal 1 dan mengirim tautannya ke email admin. Pembuatan bisa memakan waktu 1–3 menit.</p>
@@ -2959,7 +2960,7 @@ const AKSI = {
   buatLaporan: async el => {
     const p = $('#perLap').value, h = $('#hasilLap');
     el.disabled = true; el.innerHTML = '<span class="spinner"></span> Membuat laporan…';
-    const r = await api('buatLaporan', { periode: p, kelompok: $('#kelLap').value }, { batas: 300000 });
+    const r = await api('buatLaporan', { periode: p, kelompok: $('#kelLap').value, posyandu: $('#posLap').value }, { batas: 300000 });
     el.disabled = false; el.textContent = 'Buat laporan';
     const file = r.ok ? (r.data.file || [{ kelompok: 'Balita', nama: r.data.nama, url: r.data.url, unduh: r.data.unduh }]) : [];
     h.innerHTML = r.ok ? file.map(f => `<div class="pesan-info" style="margin-top:12px"><b>${esc(f.kelompok)}</b> — ${esc(f.nama)} siap.</div><div class="deret-tombol">
