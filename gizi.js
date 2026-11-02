@@ -488,6 +488,7 @@ function hitungBumil(d) {
   if (stLILA === 'KEK') kuning.push('Kurang energi kronis (LiLA ' + String(lila).replace('.', ',') + ' cm)');
   if (d.ttd === 'Tidak teratur' || d.ttd === 'Tidak minum') kuning.push('TTD ' + d.ttd.toLowerCase());
   if (+d.bb > 0 && +d.bbLalu > 0 && +d.bb < +d.bbLalu) kuning.push('Berat badan turun dari kunjungan lalu');
+  if (d.tbcBatuk === 'Y' || d.tbcDemam === 'Y' || d.tbcKontak === 'Y') kuning.push('Ada gejala atau kontak TBC — rujuk untuk pemeriksaan TBC');
   return { stLILA: stLILA, stTD: stTD, stHb: stHb, label: merah.length ? 'Merah' : kuning.length ? 'Kuning' : 'Hijau', alasan: merah.concat(kuning) };
 }
 function validasiBumil(d) {
@@ -501,6 +502,7 @@ function validasiBumil(d) {
   if (+d.sistol && +d.sistol <= +d.diastol) return 'Sistol (angka atas) harus lebih besar dari diastol (angka bawah).';
   if (+d.hb && (+d.hb < 3 || +d.hb > 20)) return 'Hb harus 3 sampai 20 g/dL.';
   if (+d.ttdJumlah && (+d.ttdJumlah < 0 || +d.ttdJumlah > 62)) return 'Jumlah TTD diminum harus 0 sampai 62 tablet.';
+  if (+d.mtPorsi && (+d.mtPorsi < 0 || +d.mtPorsi > 90 || Math.floor(+d.mtPorsi) !== +d.mtPorsi)) return 'Jumlah porsi MT harus bilangan bulat 0 sampai 90.';
   return '';
 }
 
@@ -550,6 +552,7 @@ function hitungNifas(d) {
   var masalah = String(d.masalah || '').split(', ').filter(Boolean);
   if (masalah.length) kuning.push('Masalah menyusui: ' + masalah.join(', ').toLowerCase());
   if (+d.hariPasca > 42 && !sudahBerKB(d.kb)) kuning.push('Belum ber-KB setelah masa nifas');
+  if (d.tbcBatuk === 'Y' || d.tbcDemam === 'Y' || d.tbcKontak === 'Y') kuning.push('Ada gejala atau kontak TBC — rujuk untuk pemeriksaan TBC');
   return { stTD: stTD, label: merah.length ? 'Merah' : kuning.length ? 'Kuning' : 'Hijau', alasan: merah.concat(kuning) };
 }
 

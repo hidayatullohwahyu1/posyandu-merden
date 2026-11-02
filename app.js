@@ -343,12 +343,14 @@ function terapkanLokal(d, it) {
     case 'simpanPeriksaBumil': {
       const i = d.ibuById[x.id]; if (!i) return;
       const lalu = Object.values(d.periksaIbu[i.id] || {}).filter(k => k.periode < x.periode && +k.bb > 0).sort((a, c) => (a.periode < c.periode ? 1 : -1))[0];
-      const h = hitungBumil({ lila: x.lila, sistol: x.sistol, diastol: x.diastol, hb: x.hb, bahaya: x.bahaya, ttd: x.ttd, bb: x.bb, bbLalu: lalu ? lalu.bb : 0 });
+      const h = hitungBumil({ lila: x.lila, sistol: x.sistol, diastol: x.diastol, hb: x.hb, bahaya: x.bahaya, ttd: x.ttd, bb: x.bb, bbLalu: lalu ? lalu.bb : 0,
+        tbcBatuk: x.tbcBatuk, tbcDemam: x.tbcDemam, tbcKontak: x.tbcKontak });
       const uk = usiaKehamilan(i.hpht, x.tgl);
       (d.periksaIbu[i.id] = d.periksaIbu[i.id] || {})[x.periode] = { id: i.id, periode: x.periode, tgl: x.tgl, uk: uk === null ? '' : uk, trimester: trimester(uk),
         bb: x.bb || '', lila: x.lila || '', stLILA: h.stLILA, sistol: x.sistol || '', diastol: x.diastol || '', stTD: h.stTD, anc: x.anc, tglANC: x.anc === 'Y' ? x.tglANC : '',
         tempatANC: x.anc === 'Y' ? x.tempatANC : '', hb: x.hb || '', stHb: h.stHb, ttd: x.ttd, ttdJumlah: x.ttdJumlah, bahaya: x.bahaya, edukasi: x.edukasi, kelas: x.kelas,
-        label: h.label, alasan: h.alasan.join('; '), diubahPada: '', petugas: S.sesi ? S.sesi.user.username : '', _lokal: true };
+        label: h.label, alasan: h.alasan.join('; '), diubahPada: '', petugas: S.sesi ? S.sesi.user.username : '',
+        tbcBatuk: x.tbcBatuk || '', tbcDemam: x.tbcDemam || '', tbcKontak: x.tbcKontak || '', mtKomposisi: x.mtKomposisi || '', mtPorsi: x.mtPorsi, mtRutin: x.mtRutin || '', rujuk: x.rujuk || '', _lokal: true };
       break; }
     case 'hapusPeriksaBumil':
       if (d.periksaIbu[x.id]) delete d.periksaIbu[x.id][x.periode];
@@ -360,10 +362,12 @@ function terapkanLokal(d, it) {
       if (x.imd) i.imd = x.imd;
       if (x.kbMetode) { i.kbMetode = x.kbMetode; i.kbTgl = sudahBerKB(x.kbMetode) ? x.kbTgl : ''; }
       const hari = Math.floor((tglKeMs(x.tgl) - tglKeMs(i.tglPersalinan)) / 864e5), usiaBayi = usiaBulan(i.tglPersalinan, x.tgl);
-      const h = hitungNifas({ sistol: x.sistol, diastol: x.diastol, bahaya: x.bahaya, asi: x.asi, usiaBayiBln: usiaBayi, masalah: x.masalah, kb: i.kbMetode, hariPasca: hari });
+      const h = hitungNifas({ sistol: x.sistol, diastol: x.diastol, bahaya: x.bahaya, asi: x.asi, usiaBayiBln: usiaBayi, masalah: x.masalah, kb: i.kbMetode, hariPasca: hari,
+        tbcBatuk: x.tbcBatuk, tbcDemam: x.tbcDemam, tbcKontak: x.tbcKontak });
       (d.nifasIbu[i.id] = d.nifasIbu[i.id] || {})[x.periode] = { id: i.id, periode: x.periode, tgl: x.tgl, hariPasca: hari, usiaBayi, sistol: x.sistol || '', diastol: x.diastol || '',
         stTD: h.stTD, bahaya: x.bahaya, asi: x.asi, masalah: x.masalah, edukasi: x.edukasi, label: h.label, alasan: h.alasan.join('; '), diubahPada: '',
-        petugas: S.sesi ? S.sesi.user.username : '', _lokal: true };
+        petugas: S.sesi ? S.sesi.user.username : '', bb: x.bb || '', tbcBatuk: x.tbcBatuk || '', tbcDemam: x.tbcDemam || '', tbcKontak: x.tbcKontak || '',
+        vitAKapsul: x.vitAKapsul, vitARutin: x.vitARutin || '', rujuk: x.rujuk || '', _lokal: true };
       break; }
     case 'catatPersalinan': {
       const i = d.ibuById[x.id]; if (!i) return;
@@ -1400,11 +1404,13 @@ const tdTeks = x => x && +x.sistol ? x.sistol + '/' + x.diastol : '–';
 
 /* Kartu Bantu Lansia satu posyandu: server membuat paling banyak MAKS_KARTU_L orang per PDF, jadi dibagi per bagian */
 const MAKS_KARTU_L = 60;
-function tombolKartuLansia() {
-  const pos = admin() ? S.pos : S.sesi.user.posyandu;
-  if (!pos) return `<button class="tombol garis penuh" data-aksi="kartuBantu" data-kel="lansia" data-pos="1" style="margin-bottom:10px">${ikon('dokumen', 20)} Kartu Bantu semua lansia (pilih posyandu)</button>`;
-  const n = sasaranLansia(pos).length, bag = Math.max(1, Math.ceil(n / MAKS_KARTU_L));
-  return Array.from({ length: bag }, (_, i) => `<button class="tombol garis penuh" data-aksi="kartuBantu" data-kel="lansia" data-pos="1" data-bagian="${i + 1}" style="margin-bottom:10px">${ikon('dokumen', 20)} Kartu Bantu lansia ${esc(pos)}${bag > 1 ? ` no. ${i * MAKS_KARTU_L + 1}–${Math.min(n, (i + 1) * MAKS_KARTU_L)}` : ''} (PDF)</button>`).join('');
+function tombolKartuLansia() { return tombolKartuKelompok('lansia'); }
+/* kel = 'lansia' | 'ibu' (ibu hamil + nifas yang masih dipantau) */
+function tombolKartuKelompok(kel) {
+  const pos = admin() ? S.pos : S.sesi.user.posyandu, nama = kel === 'ibu' ? 'ibu hamil & nifas' : 'lansia';
+  if (!pos) return `<button class="tombol garis penuh" data-aksi="kartuBantu" data-kel="${kel}" data-pos="1" style="margin-bottom:10px">${ikon('dokumen', 20)} Kartu Bantu semua ${nama} (pilih posyandu)</button>`;
+  const n = kel === 'ibu' ? sasaranIbu(pos).length + sasaranNifas(pos).length : sasaranLansia(pos).length, bag = Math.max(1, Math.ceil(n / MAKS_KARTU_L));
+  return Array.from({ length: bag }, (_, i) => `<button class="tombol garis penuh" data-aksi="kartuBantu" data-kel="${kel}" data-pos="1" data-bagian="${i + 1}" style="margin-bottom:10px">${ikon('dokumen', 20)} Kartu Bantu ${nama} ${esc(pos)}${bag > 1 ? ` no. ${i * MAKS_KARTU_L + 1}–${Math.min(n, (i + 1) * MAKS_KARTU_L)}` : ''} (PDF)</button>`).join('');
 }
 function viewLansia() {
   if (!S.periodeL) S.periodeL = periodeKini();
@@ -1837,7 +1843,8 @@ function viewMateriMPASI() {
    IBU HAMIL — daftar, kunjungan bulanan, profil, tambah/ubah, persalinan, keluar
    ===================================================================== */
 const KOL_PERIKSA_IBU = ['id', 'periode', 'tgl', 'uk', 'trimester', 'bb', 'lila', 'stLILA', 'sistol', 'diastol', 'stTD', 'anc', 'tglANC', 'tempatANC',
-  'hb', 'stHb', 'ttd', 'ttdJumlah', 'bahaya', 'edukasi', 'kelas', 'label', 'alasan', 'diubahPada', 'petugas'];
+  'hb', 'stHb', 'ttd', 'ttdJumlah', 'bahaya', 'edukasi', 'kelas', 'label', 'alasan', 'diubahPada', 'petugas',
+  'tbcBatuk', 'tbcDemam', 'tbcKontak', 'mtKomposisi', 'mtPorsi', 'mtRutin', 'rujuk'];
 const TEMPAT_ANC = ['Puskesmas', 'Bidan desa/praktik', 'Klinik/RS', 'Dokter'];
 const kunjunganDi = (id, p) => (S.d.periksaIbu[id] || {})[p] || null;
 function kunjunganTerakhir(id) { const u = S.d.periksaIbu[id] || {}, ps = Object.keys(u).sort(); return ps.length ? u[ps[ps.length - 1]] : null; }
@@ -1870,6 +1877,7 @@ function viewBumil() {
     <div class="chips" style="flex-wrap:wrap">${[['belum', 'Belum dikunjungi'], ['sudah', 'Sudah dikunjungi'], ['hpl', 'HPL ≤ 30 hari'], ['semua', 'Semua']].map(f => `<button class="chip ${(S.filterIbu || 'belum') === f[0] ? 'aktif' : ''}" data-aksi="filterIbu" data-f="${f[0]}">${f[1]}</button>`).join('')}</div>
     <div class="deret-tombol" style="margin-bottom:10px"><button class="tombol garis" data-aksi="ke" data-ke="tambah-bumil">${ikon('tambah', 20)} Tambah ibu hamil</button>
       <button class="tombol garis" data-aksi="ke" data-ke="materi-bumil">Edukasi</button></div>
+    ${tombolKartuKelompok('ibu')}
     <div id="daftarIbu"></div>`,
     setelah: () => { isiDaftarIbu(); const c = $('#cariIbu'); c.addEventListener('input', () => { S.cariIbu = c.value; isiDaftarIbu(); }); } };
 }
@@ -1920,6 +1928,12 @@ function formPeriksaBumil(id, periode) {
         <label class="isian"><span>Sistol (angka atas)</span><div class="isian-angka"><input name="sistol" inputmode="numeric" enterkeyhint="next" value="${nilai('sistol')}" placeholder="110" ${dis}><em>mmHg</em></div></label>
         <label class="isian"><span>Diastol (angka bawah)</span><div class="isian-angka"><input name="diastol" inputmode="numeric" enterkeyhint="next" value="${nilai('diastol')}" placeholder="70" ${dis}><em>mmHg</em></div></label>
       </div>
+      <div class="judul-sub">Skrining gejala TBC</div>
+      <div class="grid2">
+        <div class="isian"><span>Batuk terus-menerus</span>${segYT('tbcBatuk', u && u.tbcBatuk, dis)}</div>
+        <div class="isian"><span>Demam ≥ 2 minggu</span>${segYT('tbcDemam', u && u.tbcDemam, dis)}</div>
+        <div class="isian"><span>Kontak erat pasien TBC</span>${segYT('tbcKontak', u && u.tbcKontak, dis)}</div>
+      </div>
       <div class="judul-sub" style="margin-top:4px">Dari buku KIA</div>
       <div class="grid2">
         <label class="isian"><span>Periksa ke bidan/dokter bulan ini</span>${segYT('anc', u && u.anc, dis, [['Y', 'Ya'], ['T', 'Belum']])}</label>
@@ -1932,6 +1946,13 @@ function formPeriksaBumil(id, periode) {
         <label class="isian"><span>Jumlah TTD diminum</span><div class="isian-angka"><input name="ttdJumlah" inputmode="numeric" enterkeyhint="next" value="${u && u.ttdJumlah !== '' && u.ttdJumlah !== undefined ? u.ttdJumlah : ''}" placeholder="30" ${dis}><em>tablet</em></div></label>
       </div>
       <label class="isian"><span>Ikut kelas ibu hamil bulan ini</span>${segYT('kelas', u && u.kelas, dis)}</label>
+      <details class="lipat" ${(u && (u.mtKomposisi || u.mtRutin)) || (lalu && lalu.stLILA === 'KEK') ? 'open' : ''}><summary>Makanan tambahan (MT) bumil KEK</summary>
+        <label class="isian"><span>Komposisi MT dari nakes</span><input name="mtKomposisi" maxlength="60" placeholder="Contoh: biskuit, telur, susu" value="${u ? esc(u.mtKomposisi || '') : ''}" ${dis}></label>
+        <div class="grid2">
+          <label class="isian"><span>Jumlah porsi</span><div class="isian-angka"><input name="mtPorsi" inputmode="numeric" value="${u && u.mtPorsi !== '' && u.mtPorsi !== undefined ? u.mtPorsi : ''}" placeholder="–" ${dis}><em>porsi</em></div></label>
+          <div class="isian"><span>Rutin dimakan</span>${segYT('mtRutin', u && u.mtRutin, dis)}</div>
+        </div></details>
+      <div class="isian"><span>Dirujuk ke bidan/puskesmas bulan ini</span>${segYT('rujuk', u && u.rujuk, dis)}</div>
       <div class="isian"><span class="redup kecil" style="display:block;margin-bottom:6px;font-weight:550">Edukasi yang diberikan</span>${chips('edu', EDUKASI_BUMIL, u ? u.edukasi : '')}
         <a href="#/materi-bumil" class="kecil">Lihat bahan edukasi ibu hamil</a></div>
       <div id="galatPB"></div>
@@ -1948,12 +1969,13 @@ async function simpanPeriksaBumilForm(f) {
   const id = f.dataset.id, periode = f.dataset.periode, x0 = S.d.ibuById[id];
   const ambil = n => Array.from(f.querySelectorAll(`input[name=${n}]:checked`)).map(i => i.value).join(', ');
   const x = { id, periode, tgl: f.tgl.value, anc: f.anc.value, tglANC: f.tglANC.value, tempatANC: f.tempatANC.value, ttd: f.ttd.value, kelas: f.kelas.value,
-    bahaya: ambil('bahaya'), edukasi: ambil('edu') };
-  const nama = { bb: 'Berat badan', lila: 'LiLA', sistol: 'Sistol', diastol: 'Diastol', hb: 'Hb', ttdJumlah: 'Jumlah TTD' };
+    bahaya: ambil('bahaya'), edukasi: ambil('edu'), tbcBatuk: f.tbcBatuk.value, tbcDemam: f.tbcDemam.value, tbcKontak: f.tbcKontak.value,
+    mtKomposisi: rapiSpasi(f.mtKomposisi.value), mtRutin: f.mtRutin.value, rujuk: f.rujuk.value };
+  const nama = { bb: 'Berat badan', lila: 'LiLA', sistol: 'Sistol', diastol: 'Diastol', hb: 'Hb', ttdJumlah: 'Jumlah TTD', mtPorsi: 'Jumlah porsi MT' };
   for (const k of Object.keys(nama)) {
     const n = bacaAngka(f[k].value);
     if (Number.isNaN(n)) { $('#galatPB').innerHTML = `<div class="pesan-galat">${nama[k]} harus berupa angka.</div>`; return; }
-    x[k] = n === '' ? (k === 'ttdJumlah' ? '' : 0) : n;
+    x[k] = n === '' ? (k === 'ttdJumlah' || k === 'mtPorsi' ? '' : 0) : n;
   }
   const err = validasiBumil(x) || (x.tgl < x0.hpht ? 'Tanggal kunjungan sebelum HPHT.' : x.tgl > hariIni() ? 'Tanggal kunjungan tidak boleh setelah hari ini.' : '');
   if (err) { $('#galatPB').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
@@ -2009,6 +2031,7 @@ function viewProfilIbu(id) {
         ${hamil ? `<button class="tombol" data-aksi="formPeriksaBP" data-id="${esc(id)}" data-p="${periodeKini()}">${ikon('nadi', 20)} Kunjungan</button>` : ''}
         <button class="tombol garis" data-aksi="ke" data-ke="ubah-bumil/${esc(id)}">Ubah data</button>
         ${hamil ? `<button class="tombol garis" data-aksi="persalinan" data-id="${esc(id)}">Catat persalinan</button>` : ''}
+        <button class="tombol garis" data-aksi="kartuBantu" data-kel="ibu" data-id="${esc(id)}">${ikon('dokumen', 20)} Kartu Bantu (PDF)</button>
       </div>
       ${x.status === 'Hamil' || x.status === 'Nifas' ? tombolPindah('ibu', id) : ''}
       ${hamil && !x.usulKeluar ? `<button class="tautan-bahaya" data-aksi="keluarIbu" data-id="${esc(id)}">Keluarkan (keguguran/pindah/meninggal)</button>` : ''}
@@ -2174,7 +2197,8 @@ function viewMateriBumil() {
 }
 
 /* ---------- Nifas, KB pasca salin, menyusui (sampai bayi 6 bulan) ---------- */
-const KOL_NIFAS = ['id', 'periode', 'tgl', 'hariPasca', 'usiaBayi', 'sistol', 'diastol', 'stTD', 'bahaya', 'asi', 'masalah', 'edukasi', 'label', 'alasan', 'diubahPada', 'petugas'];
+const KOL_NIFAS = ['id', 'periode', 'tgl', 'hariPasca', 'usiaBayi', 'sistol', 'diastol', 'stTD', 'bahaya', 'asi', 'masalah', 'edukasi', 'label', 'alasan', 'diubahPada', 'petugas',
+  'bb', 'tbcBatuk', 'tbcDemam', 'tbcKontak', 'vitAKapsul', 'vitARutin', 'rujuk'];
 const KOL_IBU_C = ['id', 'nik', 'kk', 'nama', 'tglLahir', 'suami', 'rt', 'rw', 'dusun', 'posyandu', 'hp', 'gravida', 'para', 'abortus', 'tglPersalinanAkhir', 'hpht', 'hpl',
   'tb', 'bbPra', 'bukuKIA', 'p4k', 'status', 'tglMasuk', 'tglKeluar', 'usulKeluar', 'usulTanggal', 'tglPersalinan', 'tempatPersalinan', 'penolong', 'caraPersalinan',
   'kondisiIbu', 'idBayi', 'catatan', 'imd', 'kf1', 'kf2', 'kf3', 'kf4', 'vitANifas', 'kbMetode', 'kbTgl'];
@@ -2245,7 +2269,15 @@ function formNifas(id, periode) {
       <div class="grid2">
         <label class="isian"><span>Sistol</span><div class="isian-angka"><input name="sistol" inputmode="numeric" enterkeyhint="next" value="${u && +u.sistol ? u.sistol : ''}" placeholder="110" ${dis}><em>mmHg</em></div></label>
         <label class="isian"><span>Diastol</span><div class="isian-angka"><input name="diastol" inputmode="numeric" enterkeyhint="next" value="${u && +u.diastol ? u.diastol : ''}" placeholder="70" ${dis}><em>mmHg</em></div></label>
+        <label class="isian"><span>Berat badan ibu</span><div class="isian-angka"><input name="bb" inputmode="decimal" enterkeyhint="next" value="${u && +u.bb ? esc(angka(u.bb)) : ''}" placeholder="0,0" ${dis}><em>kg</em></div></label>
       </div>
+      <div class="judul-sub">Skrining gejala TBC</div>
+      <div class="grid2">
+        <div class="isian"><span>Batuk terus-menerus</span>${segYT('tbcBatuk', u && u.tbcBatuk, dis)}</div>
+        <div class="isian"><span>Demam ≥ 2 minggu</span>${segYT('tbcDemam', u && u.tbcDemam, dis)}</div>
+        <div class="isian"><span>Kontak erat pasien TBC</span>${segYT('tbcKontak', u && u.tbcKontak, dis)}</div>
+      </div>
+
       <div class="judul-sub" style="margin-top:4px">Menyusui</div>
       <label class="isian"><span>Bayi bulan ini diberi (usia ${usiaTeks(usiaBayi)})</span><select name="asi" ${dis}><option value="">–</option>${STATUS_ASI.map(t => `<option ${u && u.asi === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <div class="isian"><span class="redup kecil" style="display:block;margin-bottom:6px;font-weight:550">Masalah menyusui</span>${chips('masalah', MASALAH_MENYUSUI, u ? u.masalah : '')}</div>
@@ -2254,7 +2286,10 @@ function formNifas(id, periode) {
       <div class="grid2">
         <label class="isian"><span>Vitamin A nifas (2 kapsul)</span>${yt('vitANifas', x.vitANifas)}</label>
         <label class="isian"><span>IMD saat lahir</span>${yt('imd', x.imd)}</label>
+        <label class="isian"><span>Kapsul vitamin A dari nakes bulan ini</span><select name="vitAKapsul" ${dis}><option value="">–</option>${[0, 1, 2].map(n => `<option value="${n}" ${u && u.vitAKapsul !== '' && u.vitAKapsul !== undefined && +u.vitAKapsul === n ? 'selected' : ''}>${n} kapsul</option>`).join('')}</select></label>
+        <div class="isian"><span>Rutin minum vitamin A</span>${yt('vitARutin', u && u.vitARutin)}</div>
       </div>
+      <div class="isian"><span>Dirujuk ke bidan/puskesmas bulan ini</span>${yt('rujuk', u && u.rujuk)}</div>
       <div class="judul-sub">KB pasca salin</div>
       <div class="grid2">
         <label class="isian"><span>Metode</span><select name="kbMetode" ${dis}><option value="">–</option>${METODE_KB.map(t => `<option ${x.kbMetode === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
@@ -2276,8 +2311,12 @@ async function simpanNifasForm(f) {
   const s = bacaAngka(f.sistol.value), d = bacaAngka(f.diastol.value);
   const x = { id, periode, tgl: f.tgl.value, bahaya: ambil('bahaya'), masalah: ambil('masalah'), edukasi: ambil('edu'), asi: f.asi.value,
     kf1: f.kf1.value, kf2: f.kf2.value, kf3: f.kf3.value, kf4: f.kf4.value, vitANifas: f.vitANifas.value, imd: f.imd.value, kbMetode: f.kbMetode.value, kbTgl: f.kbTgl.value,
-    sistol: s === '' || Number.isNaN(s) ? 0 : s, diastol: d === '' || Number.isNaN(d) ? 0 : d };
-  const err = !x.tgl || periodeDari(x.tgl) !== periode ? 'Tanggal kunjungan harus di dalam periode ' + namaPeriode(periode) + '.'
+    sistol: s === '' || Number.isNaN(s) ? 0 : s, diastol: d === '' || Number.isNaN(d) ? 0 : d,
+    tbcBatuk: f.tbcBatuk.value, tbcDemam: f.tbcDemam.value, tbcKontak: f.tbcKontak.value, vitAKapsul: f.vitAKapsul.value === '' ? '' : +f.vitAKapsul.value,
+    vitARutin: f.vitARutin.value, rujuk: f.rujuk.value };
+  const bbN = bacaAngka(f.bb.value);
+  x.bb = bbN === '' || Number.isNaN(bbN) ? 0 : bbN;
+  const err = Number.isNaN(bbN) ? 'Berat badan harus berupa angka.' : x.bb && (x.bb < 30 || x.bb > 150) ? 'Berat badan harus 30 sampai 150 kg.' : !x.tgl || periodeDari(x.tgl) !== periode ? 'Tanggal kunjungan harus di dalam periode ' + namaPeriode(periode) + '.'
     : x.tgl < x0.tglPersalinan ? 'Tanggal kunjungan sebelum persalinan.' : Number.isNaN(s) || Number.isNaN(d) ? 'Tekanan darah harus berupa angka.'
     : (x.sistol > 0) !== (x.diastol > 0) ? 'Isi tekanan darah lengkap: sistol dan diastol.' : x.sistol && (x.sistol <= x.diastol || x.sistol > 260 || x.sistol < 60) ? 'Tekanan darah tidak wajar.'
     : validasiTglNifas(x0.tglPersalinan, hariIni(), { kf1: x.kf1, kf2: x.kf2, kf3: x.kf3, kf4: x.kf4, kbTgl: sudahBerKB(x.kbMetode) ? x.kbTgl : '' });
@@ -2964,11 +3003,12 @@ const AKSI = {
     // Kartu Bantu Pemeriksaan Bayi, Balita, dan Apras: diisi server dari template desa, hasilnya PDF siap cetak
     if (!S.online) { toast('Perlu sinyal untuk membuat Kartu Bantu.'); return; }
     if (S.antrean.some(o => o.status === 'menunggu')) { await kirimAntrean(); }
-    const semua = !!el.dataset.pos, pos = admin() ? S.pos : S.sesi.user.posyandu, lansia = el.dataset.kel === 'lansia', orang = lansia ? 'lansia' : 'anak';
+    const semua = !!el.dataset.pos, pos = admin() ? S.pos : S.sesi.user.posyandu, kel = el.dataset.kel || 'balita', lansia = kel === 'lansia',
+      orang = { balita: 'anak', lansia: 'lansia', ibu: 'ibu' }[kel] || 'anak';
     if (semua && !pos) { toast('Pilih posyandu dulu di atas daftar.'); return; }
     const teks = el.innerHTML; el.disabled = true;
-    el.innerHTML = `<span class="spinner"></span> ${semua ? `Menyiapkan kartu semua ${lansia ? 'lansia' : 'balita'} (1–4 menit)…` : 'Menyiapkan kartu…'}`;
-    const r = await api(lansia ? 'kartuBantuLansia' : 'kartuBantu', semua ? { posyandu: pos, bagian: +el.dataset.bagian || 1 } : { id: el.dataset.id }, { batas: 330000 });
+    el.innerHTML = `<span class="spinner"></span> ${semua ? `Menyiapkan kartu semua ${{ balita: 'balita', lansia: 'lansia', ibu: 'ibu' }[kel]} (1–4 menit)…` : 'Menyiapkan kartu…'}`;
+    const r = await api({ balita: 'kartuBantu', lansia: 'kartuBantuLansia', ibu: 'kartuBantuIbu' }[kel] || 'kartuBantu', semua ? { posyandu: pos, bagian: +el.dataset.bagian || 1 } : { id: el.dataset.id }, { batas: 330000 });
     el.disabled = false; el.innerHTML = teks;
     if (!r.ok) { toast(r.pesan, 5000); return; }
     bukaLembar(`<h3>Kartu Bantu siap</h3><div class="redup kecil" style="margin-bottom:12px">${esc(r.data.nama)} · ${r.data.jumlah} ${orang} · tersimpan di folder Drive desa</div>
