@@ -254,15 +254,17 @@ nav.bawah button.tengah.aktif { color: var(--utama); }
 .hasil.Merah { background: var(--merah-bg); } .hasil.Kuning { background: var(--kuning-bg); } .hasil.Hijau { background: var(--oke-bg); }
 .hasil ul { margin: 6px 0 0; padding-left: 18px; }
 
-/* login */
-.halaman-login { min-height: 100vh; max-width: 460px; margin: 0 auto; }
-.login-atas { background: var(--gradasi); color: #fff; padding: calc(48px + env(safe-area-inset-top)) 24px 70px; border-radius: 0 0 32px 32px; position: relative; overflow: hidden; }
-.login-atas::after { content: ""; position: absolute; right: -70px; top: -50px; width: 230px; height: 230px; border-radius: 50%; background: rgba(255,255,255,.09); }
-.login-atas h1 { margin: 0 0 4px; font-size: 1.6rem; font-weight: 800; }
-.login-atas p { margin: 0; opacity: .9; }
-.logo-besar { display: block; width: 76px; height: 76px; border-radius: 22px; margin-bottom: 16px; box-shadow: 0 8px 20px rgba(0,0,0,.18); }
-.login-kartu { background: #fff; border-radius: 24px; margin: -44px 16px 0; padding: 22px 18px; box-shadow: var(--bayang-kuat); position: relative; }
-.login-bawah { padding: 18px 16px 30px; }
+/* login: latar polos, semua rata tengah, lebar konten dibatasi agar rapi di HP kecil maupun tablet */
+.halaman-login { min-height: 100vh; min-height: 100dvh; max-width: 440px; margin: 0 auto; background: #fff; display: flex; flex-direction: column;
+  padding: calc(36px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom)); text-align: center; }
+.login-atas { display: flex; flex-direction: column; align-items: center; }
+.logo-login { display: block; width: 112px; height: 112px; object-fit: contain; margin: 0 0 14px; }
+.login-atas h1 { margin: 0; font-size: 1.65rem; line-height: 1.2; font-weight: 800; color: var(--utama); letter-spacing: .2px; }
+.login-atas p { margin: 6px 0 0; color: var(--teks-2); font-size: .95rem; line-height: 1.35; }
+.login-kartu { background: #fff; border: 1px solid var(--garis); border-radius: 20px; margin: 22px 0 0; padding: 20px 18px; text-align: left; box-shadow: 0 6px 22px rgba(20, 40, 80, .07); }
+.login-kartu h2 { margin: 0 0 14px; font-size: 1.1rem; text-align: center; }
+.login-bawah { margin-top: auto; padding-top: 18px; }
+.login-bawah p { margin: 14px 0 0; color: var(--teks-2); font-size: .82rem; line-height: 1.4; }
 .halaman-muat { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 24px 20px; max-width: 420px; margin: 0 auto; }
 
 /* grafik */
@@ -419,9 +421,9 @@ form .chip.aktif { border-color: var(--utama); }
 .hero-kartu.dewasa .progres i { background: linear-gradient(90deg, #9a6bff, #6c3fd8); }
 
 /* kelompok layanan di halaman masuk */
-.layanan-login { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 18px 12px 0; }
-.layanan-login span { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; color: var(--teks-2); text-align: center; }
-.layanan-login .bulat { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; color: #fff; }
+.layanan-login { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: 20px 0 0; align-items: start; }
+.layanan-login span { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: .76rem; line-height: 1.2; font-weight: 600; color: var(--teks-2); text-align: center; overflow-wrap: anywhere; }
+.layanan-login .bulat { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; color: #fff; }
 
 /* beranda: kelompok tanpa sasaran cukup satu baris */
 .kartu-tipis { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 18px; padding: 10px 12px; margin-bottom: 10px; box-shadow: var(--bayang); }
@@ -458,3 +460,14 @@ details.lipat[open] { padding-bottom: 6px; }
 .tabel-wrap table { font-size: .82rem; }
 .tabel-wrap th, .tabel-wrap td { padding: 9px 4px; }
 .tabel-wrap .lbl { padding: 2px 7px; font-size: .74rem; }
+/* halaman masuk di layar pendek (≤ 700 px): seluruh isi muat tanpa digulir */
+@media (max-height: 700px) {
+  .halaman-login { padding-top: calc(18px + env(safe-area-inset-top)); }
+  .logo-login { width: 84px; height: 84px; margin-bottom: 8px; }
+  .login-atas h1 { font-size: 1.45rem; }
+  .layanan-login { margin-top: 14px; }
+  .layanan-login .bulat { width: 38px; height: 38px; }
+  .login-kartu { margin-top: 14px; padding: 16px 16px; }
+  .login-kartu h2 { margin-bottom: 10px; }
+  .login-bawah { padding-top: 10px; } .login-bawah p { margin-top: 8px; }
+}

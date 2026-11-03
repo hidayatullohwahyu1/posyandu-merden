@@ -792,33 +792,29 @@ function segarkan() {
 }
 
 /* ---------- Login ---------- */
-/* Logo aplikasi: rumah (posyandu) dengan hati (layanan kesehatan keluarga). SVG di dalam aplikasi, tetap tampil tanpa internet. */
-const LOGO_SVG = `<svg class="logo-besar" viewBox="0 0 64 64" role="img" aria-label="Logo Posyandu"><rect width="64" height="64" rx="16" fill="#fff"/>
-  <path d="M14 30 32 15l18 15" fill="none" stroke="#1468e5" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M19 28v20a3 3 0 0 0 3 3h20a3 3 0 0 0 3-3V28" fill="none" stroke="#1468e5" stroke-width="4.5" stroke-linejoin="round"/>
-  <path d="M32 46s-8.5-5-8.5-10.6a4.6 4.6 0 0 1 8.5-2.5 4.6 4.6 0 0 1 8.5 2.5C40.5 41 32 46 32 46z" fill="#ff5b93"/></svg>`;
-const KELOMPOK_LAYANAN = [['Balita', 'bayi', 'w-biru'], ['Ibu hamil', 'ibu', 'w-pink'], ['Remaja', 'remaja', 'w-oranye'], ['Usia dewasa', 'orang', 'w-ungu'], ['Lansia', 'lansia', 'w-hijau']];
+/* Logo Posyandu (latar transparan, disimpan di aplikasi sehingga tetap tampil tanpa internet) */
+const KELOMPOK_LAYANAN = [['Balita', 'bayi', 'w-biru'], ['Ibu hamil', 'ibu', 'w-pink'], ['Remaja', 'remaja', 'w-oranye'], ['Dewasa', 'orang', 'w-ungu'], ['Lansia', 'lansia', 'w-hijau']];
 function viewLogin() {
   return `<div class="halaman-login">
     <div class="login-atas">
-      ${LOGO_SVG}
+      <img class="logo-login" src="icons/logo-posyandu.webp" width="112" height="112" alt="Logo Posyandu">
       <h1>${esc(C.NAMA)}</h1>
-      <p>Posyandu ILP ${esc(C.DESA)}: balita, ibu hamil, usia sekolah &amp; remaja, usia dewasa &amp; lansia</p>
+      <p>Integrasi Layanan Primer · ${esc(C.DESA)}</p>
     </div>
+    <div class="layanan-login" aria-label="Kelompok layanan">${KELOMPOK_LAYANAN.map(k => `<span><i class="bulat ${k[2]}">${ikon(k[1], 20)}</i>${k[0]}</span>`).join('')}</div>
     <div class="login-kartu">
-    <h2 style="margin:0 0 14px;font-size:1.1rem">Masuk ke akun Anda</h2>
-    ${S.galatLogin ? `<div class="pesan-awas">${esc(S.galatLogin)}</div>` : ''}
-    <form id="fLogin" autocomplete="on">
-      <label class="isian"><span>Username</span><input name="username" autocapitalize="none" autocomplete="username" required></label>
-      <label class="isian"><span>PIN</span><input name="pin" type="password" inputmode="numeric" enterkeyhint="next" autocomplete="current-password" required></label>
-      <div id="galat"></div>
-      <button class="tombol penuh" type="submit">Masuk</button>
-    </form>
+      <h2>Masuk ke akun Anda</h2>
+      ${S.galatLogin ? `<div class="pesan-awas">${esc(S.galatLogin)}</div>` : ''}
+      <form id="fLogin" autocomplete="on">
+        <label class="isian"><span>Username</span><input name="username" autocapitalize="none" autocomplete="username" required></label>
+        <label class="isian"><span>PIN</span><input name="pin" type="password" inputmode="numeric" enterkeyhint="next" autocomplete="current-password" required></label>
+        <div id="galat"></div>
+        <button class="tombol penuh" type="submit">Masuk</button>
+      </form>
     </div>
-    <div class="layanan-login">${KELOMPOK_LAYANAN.map(k => `<span><i class="bulat ${k[2]}">${ikon(k[1], 20)}</i>${k[0]}</span>`).join('')}</div>
     <div class="login-bawah">
-    ${S.pasang ? `<button class="tombol garis penuh" data-aksi="pasang">${ikon('awan', 20)} Pasang aplikasi di HP</button>` : ''}
-    <p class="redup kecil" style="text-align:center;margin-top:20px">Lupa PIN? Hubungi admin desa · Versi ${esc(C.VERSI)}</p>
+      ${S.pasang ? `<button class="tombol garis penuh" data-aksi="pasang">${ikon('awan', 20)} Pasang aplikasi di HP</button>` : ''}
+      <p>Lupa PIN? Hubungi admin desa · Versi ${esc(C.VERSI)}</p>
     </div>
   </div>`;
 }
