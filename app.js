@@ -739,6 +739,8 @@ function rute() { const h = (location.hash || '#/beranda').slice(2).split('/'); 
    supaya sinkron di latar atau menutup lembar tidak melempar daftar kembali ke atas. */
 function render(y = window.scrollY) {
   const app = $('#app'), r = rute();
+  // halaman masuk: dokumen dikunci (tidak bisa ditarik/memantul); isi digulir di lapisannya sendiri hanya bila tidak muat
+  document.body.classList.toggle('di-login', !S.sesi);
   if (!S.sesi) { app.innerHTML = viewLogin(); return; }
   if (!S.d) {
     app.innerHTML = `<div class="halaman-muat"><div class="muat"><div class="spinner gelap"></div> Mengambil data balita…</div>
@@ -795,7 +797,7 @@ function segarkan() {
 /* Logo Posyandu (latar transparan, disimpan di aplikasi sehingga tetap tampil tanpa internet) */
 const KELOMPOK_LAYANAN = [['Balita', 'bayi', 'w-biru'], ['Ibu hamil', 'ibu', 'w-pink'], ['Remaja', 'remaja', 'w-oranye'], ['Dewasa', 'orang', 'w-ungu'], ['Lansia', 'lansia', 'w-hijau']];
 function viewLogin() {
-  return `<div class="halaman-login">
+  return `<div class="layar-login"><div class="halaman-login">
     <div class="login-atas">
       <img class="logo-login" src="icons/logo-posyandu.webp" width="112" height="112" alt="Logo Posyandu">
       <h1>${esc(C.NAMA)}</h1>
@@ -816,7 +818,7 @@ function viewLogin() {
       ${S.pasang ? `<button class="tombol garis penuh" data-aksi="pasang">${ikon('awan', 20)} Pasang aplikasi di HP</button>` : ''}
       <p>Lupa PIN? Hubungi admin desa · Versi ${esc(C.VERSI)}</p>
     </div>
-  </div>`;
+  </div></div>`;
 }
 
 async function kirimLogin(f) {

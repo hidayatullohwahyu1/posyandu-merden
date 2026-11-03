@@ -255,7 +255,11 @@ nav.bawah button.tengah.aktif { color: var(--utama); }
 .hasil ul { margin: 6px 0 0; padding-left: 18px; }
 
 /* login: latar polos, semua rata tengah, lebar konten dibatasi agar rapi di HP kecil maupun tablet */
-.halaman-login { min-height: 100vh; min-height: 100dvh; max-width: 440px; margin: 0 auto; background: #fff; display: flex; flex-direction: column;
+/* lapisan tetap setinggi layar terlihat: dokumen tidak pernah lebih tinggi dari layar, jadi tidak bisa digeser naik-turun.
+   Tarik/pantul (pull-to-refresh Chrome, rubber band iPhone) dimatikan; isi hanya digulir di sini bila tidak muat (papan ketik terbuka). */
+html:has(body.di-login), body.di-login { overflow: hidden; overscroll-behavior: none; height: 100%; }
+.layar-login { position: fixed; inset: 0; overflow-y: auto; overscroll-behavior: none; -webkit-overflow-scrolling: touch; background: #fff; z-index: 1; }
+.halaman-login { min-height: 100%; max-width: 440px; margin: 0 auto; background: #fff; display: flex; flex-direction: column;
   padding: calc(36px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom)); text-align: center; }
 .login-atas { display: flex; flex-direction: column; align-items: center; }
 .logo-login { display: block; width: 112px; height: 112px; object-fit: contain; margin: 0 0 14px; }
