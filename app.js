@@ -765,6 +765,8 @@ function render(y = window.scrollY) {
       ${n[0] === 'risiko' && jmlRisiko ? `<span class="bdg">${jmlRisiko}</span>` : ''}</button>`).join('')}</nav>`;
   perbaruiStatus();
   if (v.setelah) v.setelah();
+  // pendaftaran warga yang hadir: langsung buka formulir pemeriksaan pertama (tanpa singgah di profil)
+  if (S.lanjut) { const f = S.lanjut; S.lanjut = null; setTimeout(f, 200); }
   gulirKe(y);
 }
 /* Daftar balita diisi sesudah render (async); bila halaman sempat terlalu pendek, ulangi sekali */
@@ -883,8 +885,8 @@ function viewBeranda() {
   const nRemajaRujuk = sr.length ? lansiaMerah('remaja').length + lansiaPerluSkrining('remaja').length : 0;
   const nDewasaRujuk = sd.length ? lansiaMerah('dewasa').length + lansiaPerluSkrining('dewasa').length : 0;
   const perhatian = ubin('merah', 'risiko/balita', 'awas', ris.Merah.length, 'Balita perlu rujukan') + ubin('kuning', 'risiko/balita', 'jam', ris.Kuning.length, 'Balita waspada') +
-    ubin('ungu', 'risiko/balita', 'jam', ris.Absen.length, 'Balita absen timbang ≥ 2 bulan') + ubin('merah', 'risiko/ibu', 'ibu', nRujukIbu, 'Ibu hamil/nifas perlu rujukan') +
-    ubin('merah', 'risiko/remaja', 'remaja', nRemajaRujuk, 'Anak/remaja perlu rujukan/temuan') + ubin('merah', 'risiko/dewasa', 'orang', nDewasaRujuk, 'Usia dewasa perlu rujukan/temuan') + ubin('merah', 'risiko/lansia', 'lansia', nLansiaMerah, 'Lansia perlu rujukan') + ubin('kuning', 'risiko/lansia', 'papan', nTemuan, 'Temuan skrining lansia');
+    ubin('ungu', 'risiko/balita', 'jam', ris.Absen.length, 'Balita absen ≥ 2 bulan') + ubin('merah', 'risiko/ibu', 'ibu', nRujukIbu, 'Ibu perlu rujukan') +
+    ubin('merah', 'risiko/remaja', 'remaja', nRemajaRujuk, 'Remaja perlu rujukan') + ubin('merah', 'risiko/dewasa', 'orang', nDewasaRujuk, 'Dewasa perlu rujukan') + ubin('merah', 'risiko/lansia', 'lansia', nLansiaMerah, 'Lansia perlu rujukan') + ubin('kuning', 'risiko/lansia', 'papan', nTemuan, 'Temuan skrining lansia');
   const alatAdmin = [
     ['ke', 'pantau', 'w-tosca', 'papan', 'Pantau'],
     ['ke', 'dashboard', 'w-biru', 'batang', 'Dashboard'],
@@ -937,20 +939,80 @@ function isiHasilCari() {
   const aktif = x => x.status === 'Aktif' || x.status === 'Menunggu' || x.status === 'Hamil' || x.status === 'Nifas';
   const hasil = [];
   S.d.balita.filter(b => aktif(b) && posTerpilih(b) && cocok(b.nama, b.ibu, b.nik, 'rt ' + b.rt)).forEach(b => hasil.push({ nama: b.nama, kel: ['Balita', 'w-biru', 'bayi'], ke: 'balita/' + b.id,
+    aksi: ['formUkurP', b.id, 'Ukur', !!ukurDi(b.id, periodeKini())],
     sub: usiaTeks(usiaBulan(b.tglLahir, hariIni())) + ' · ibu ' + (b.ibu || '–') + ' · ' + rtRw(b) }));
   S.d.ibu.filter(x => aktif(x) && posTerpilih(x) && cocok(x.nama, x.suami, x.nik, 'rt ' + x.rt)).forEach(x => hasil.push({ nama: x.nama, kel: [x.status === 'Nifas' ? 'Nifas' : 'Ibu hamil', 'w-pink', 'ibu'],
-    ke: 'bumil-profil/' + x.id, sub: (x.status === 'Nifas' ? 'nifas' : 'hamil') + ' · ' + rtRw(x) }));
+    ke: 'bumil-profil/' + x.id, sub: (x.status === 'Nifas' ? 'nifas' : 'hamil') + ' · ' + rtRw(x),
+    aksi: x.status === 'Nifas' ? ['formNifasP', x.id, 'Kunjungi', false] : ['formPeriksaBP', x.id, 'Kunjungi', false] }));
   S.d.lansia.filter(l => aktif(l) && posTerpilih(l) && cocok(l.nama, l.nik, 'rt ' + l.rt)).forEach(l => { const k = kelL(l);
-    hasil.push({ nama: l.nama, kel: k === 'dewasa' ? ['Usia dewasa', 'w-ungu', 'orang'] : k === 'remaja' ? ['Remaja', 'w-oranye', 'remaja'] : ['Lansia', 'w-hijau', 'lansia'], ke: 'lansia-profil/' + l.id, sub: usiaTh(l.tglLahir) + ' th · ' + rtRw(l) }); });
+    hasil.push({ nama: l.nama, kel: k === 'dewasa' ? ['Usia dewasa', 'w-ungu', 'orang'] : k === 'remaja' ? ['Remaja', 'w-oranye', 'remaja'] : ['Lansia', 'w-hijau', 'lansia'], ke: 'lansia-profil/' + l.id, sub: usiaTh(l.tglLahir) + ' th · ' + rtRw(l),
+      aksi: ['formPeriksaLP', l.id, 'Periksa', !!periksaDi(l.id, periodeKini())] }); });
   hasil.sort((a, c) => a.nama.localeCompare(c.nama, 'id'));
   const daftar = l => [['tambah-balita', 'Balita'], ['tambah-bumil', 'Ibu hamil'], ['tambah-remaja', 'Usia sekolah/remaja'], ['tambah-dewasa', 'Usia dewasa'], ['tambah-lansia', 'Lansia']]
     .map(x => `<button class="tombol garis kecil" data-aksi="ke" data-ke="${x[0]}">${ikon('tambah', 16)} ${x[1]}</button>`).join('');
   el.innerHTML = (hasil.length ? `<p class="redup kecil" style="margin:0 4px 8px">${hasil.length > 50 ? '50 dari ' + hasil.length : hasil.length} ditemukan</p><div class="daftar">${hasil.slice(0, 50).map(h => `
-    <button class="item" data-aksi="ke" data-ke="${esc(h.ke)}"><span class="ik-grup ${h.kel[1]}">${ikon(h.kel[2], 18)}</span>
-      <span class="isi"><div class="nama">${esc(h.nama)}</div><div class="sub">${esc(h.kel[0])} · ${esc(h.sub)}</div></span>${ikon('kanan', 18)}</button>`).join('')}</div>`
+    <div class="item item-aksi"><button class="buka" data-aksi="ke" data-ke="${esc(h.ke)}"><span class="ik-grup ${h.kel[1]}">${ikon(h.kel[2], 18)}</span>
+      <span class="isi"><div class="nama">${esc(h.nama)}</div><div class="sub">${esc(h.kel[0])} · ${esc(h.sub)}</div></span></button>
+      ${h.aksi ? `<button class="tombol kecil ${h.aksi[3] ? 'garis' : ''}" data-aksi="${h.aksi[0]}" data-id="${esc(h.aksi[1])}" data-p="${periodeKini()}">${h.aksi[3] ? ikon('centang', 16) + ' Sudah' : h.aksi[2]}</button>` : ''}</div>`).join('')}</div>`
     : '<div class="kosong">Belum terdaftar di posyandu ini.</div>') +
     `<div class="kartu" style="margin-top:12px"><b>Warga baru?</b><div class="redup kecil" style="margin:4px 0 10px">Daftarkan sesuai kelompoknya:</div><div class="deret-tombol">${daftar()}</div></div>`;
 }
+
+/* ---------- Dasar penilaian & sumber: batas yang dipakai aplikasi (sama dengan gizi.js) dan rujukan resminya ---------- */
+const DASAR_PENILAIAN = {
+  balita: ['Balita 0–59 bulan', [
+    ['BB/U (berat menurut umur)', 'Sangat kurang < −3 SD · Kurang −3 s.d. < −2 SD · Normal −2 s.d. +1 SD · Risiko BB lebih > +1 SD',
+      'Permenkes RI No. 2 Tahun 2020 tentang Standar Antropometri Anak (WHO Child Growth Standards 2006)'],
+    ['PB/U atau TB/U (tinggi menurut umur)', 'Sangat pendek < −3 SD · Pendek −3 s.d. < −2 SD · Normal −2 s.d. +3 SD · Tinggi > +3 SD', 'Permenkes RI No. 2 Tahun 2020'],
+    ['BB/PB atau BB/TB (status gizi)', 'Gizi buruk < −3 SD · Gizi kurang −3 s.d. < −2 SD · Gizi baik −2 s.d. +1 SD · Berisiko gizi lebih > +1 s.d. +2 SD · Gizi lebih > +2 s.d. +3 SD · Obesitas > +3 SD',
+      'Permenkes RI No. 2 Tahun 2020'],
+    ['Lingkar kepala (LK/U)', 'Mikrosefali < −2 SD · Normal −2 s.d. +2 SD · Makrosefali > +2 SD', 'WHO Child Growth Standards 2006; Pedoman SDIDTK Kemenkes RI'],
+    ['LiLA (usia 6–59 bulan)', 'Gizi buruk < 11,5 cm · Gizi kurang 11,5 s.d. < 12,5 cm · Normal ≥ 12,5 cm',
+      'Kemenkes RI, Pedoman Pencegahan dan Tata Laksana Gizi Buruk pada Balita; WHO/UNICEF 2009'],
+    ['Naik berat badan (N/T)', 'N bila kenaikan ≥ Kenaikan BB Minimal (KBM) sesuai umur; T bila kurang; 2T (dua bulan berturut-turut) = rujuk',
+      'Buku Kesehatan Ibu dan Anak (KIA) Kemenkes RI; Permenkes RI No. 2 Tahun 2020'],
+    ['Perkembangan (KPSP)', 'Sesuai (9–10 jawaban Ya) · Meragukan (7–8) · Penyimpangan (≤ 6) = rujuk',
+      'Kemenkes RI, Pedoman Pelaksanaan Stimulasi, Deteksi dan Intervensi Dini Tumbuh Kembang Anak (SDIDTK)'],
+    ['Jadwal imunisasi', 'Sesuai jadwal imunisasi rutin lengkap', 'Kepmenkes RI No. HK.01.07/MENKES/1098/2024']]],
+  ibu: ['Ibu hamil & nifas', [
+    ['LiLA ibu hamil', 'Kurang energi kronis (KEK) < 23,5 cm', 'Buku KIA Kemenkes RI; Pedoman Pelayanan Antenatal Terpadu Kemenkes RI'],
+    ['Tekanan darah', 'Hipertensi ≥ 140/90 mmHg (waspada preeklamsia, rujuk) · Hipertensi berat ≥ 160/110 mmHg (rujuk segera)',
+      'Pedoman Pelayanan Antenatal Terpadu Kemenkes RI; PNPK Diagnosis dan Tata Laksana Preeklamsia'],
+    ['Hemoglobin (Hb)', 'Anemia < 11 g/dL · Anemia berat < 7 g/dL', 'WHO (2011) Haemoglobin concentrations for the diagnosis of anaemia and assessment of severity'],
+    ['Tablet tambah darah (TTD)', 'Minimal 90 tablet selama kehamilan, diminum setiap hari', 'Permenkes RI No. 88 Tahun 2014 tentang Standar TTD bagi Wanita Usia Subur dan Ibu Hamil'],
+    ['Tanda bahaya & kunjungan nifas (KF1–KF4)', 'Tanda bahaya = rujuk segera; jadwal KF sesuai hari pasca salin', 'Buku KIA Kemenkes RI']]],
+  remaja: ['Usia sekolah & remaja 5–17 tahun', [
+    ['IMT/U (status gizi)', 'Gizi buruk < −3 SD · Gizi kurang −3 s.d. < −2 SD · Gizi baik −2 s.d. +1 SD · Gizi lebih > +1 s.d. +2 SD · Obesitas > +2 SD',
+      'Permenkes RI No. 2 Tahun 2020 (anak 5–18 tahun, WHO Growth Reference 2007)'],
+    ['Tekanan darah & lingkar perut (usia ≥ 15 th)', 'TD normal < 130/85 · tinggi ≥ 130/85 · sangat tinggi ≥ 160/100 mmHg; lingkar perut > 90 cm (L) / > 80 cm (P) = obesitas sentral',
+      'Kartu Bantu Pemeriksaan ILP Kemenkes RI (Usia Sekolah & Remaja); klasifikasi P2PTM Kemenkes RI'],
+    ['Hb remaja putri (≥ 12 th)', 'Anemia < 12 g/dL (usia 5–11 th: < 11,5) · Anemia berat < 8 g/dL', 'WHO (2011) Haemoglobin concentrations for the diagnosis of anaemia'],
+    ['Gejala TBC', '2 gejala atau lebih (batuk terus-menerus, demam ≥ 2 minggu, BB tetap/turun) = rujuk; 1 gejala atau kontak erat = pantau',
+      'Kartu Bantu Pemeriksaan ILP Kemenkes RI (Usia Sekolah & Remaja)']]],
+  dewasa: ['Usia dewasa 18–59 & lansia 60+', [
+    ['IMT', 'Kurus < 18,5 · Normal 18,5–25,0 · Gemuk > 25,0–27,0 · Obesitas > 27,0 kg/m²', 'Klasifikasi IMT Indonesia, Direktorat P2PTM Kemenkes RI'],
+    ['Lingkar perut', 'Obesitas sentral > 90 cm (laki-laki), > 80 cm (perempuan)', 'Direktorat P2PTM Kemenkes RI'],
+    ['Tekanan darah', 'Normal < 120/80 · Pra-hipertensi 120–139/80–89 · Hipertensi derajat 1 140–159/90–99 · Derajat 2 ≥ 160/100 · Sangat tinggi ≥ 180/110 (rujuk segera)',
+      'JNC 7, dipakai Direktorat P2PTM Kemenkes RI'],
+    ['Gula darah', 'Sewaktu ≥ 200 mg/dL tinggi · Puasa 100–125 pra-diabetes, ≥ 126 tinggi', 'PERKENI, Pedoman Pengelolaan dan Pencegahan Diabetes Melitus Tipe 2 di Indonesia (2021)'],
+    ['Kolesterol total & asam urat', 'Kolesterol 200–239 batas tinggi, ≥ 240 mg/dL tinggi · Asam urat > 7 mg/dL (L), > 6 mg/dL (P) tinggi', 'Direktorat P2PTM Kemenkes RI'],
+    ['Plot di Kartu Bantu', 'IMT Normal 18,5–24,9 · TD Normal < 130/85 (legenda yang tercetak di kartu)', 'Kartu Bantu Pemeriksaan ILP Kemenkes RI (Dewasa & Lansia)'],
+    ['SKILAS (lansia)', 'Satu ranah bermasalah = pemeriksaan lanjut di Puskesmas', 'Kemenkes RI, Skrining Lansia Sederhana (SKILAS) pada ILP, diadaptasi dari WHO ICOPE (2019)'],
+    ['AKS, GDS-15, AMT (lansia)', 'AKS: 20 mandiri, 12–19 ringan, 9–11 sedang, 5–8 berat, 0–4 total · GDS ≥ 5 kemungkinan depresi · AMT < 8 gangguan kognitif',
+      'Permenkes RI No. 67 Tahun 2015 tentang Pelayanan Kesehatan Lanjut Usia di Puskesmas'],
+    ['PUMA (PPOK, usia ≥ 40 th)', 'Skor ≥ 6 = curiga PPOK, rujuk', 'Kuesioner PUMA (López Varela dkk., 2016) pada deteksi dini PPOK Kemenkes RI'],
+    ['Gejala TBC', 'Ada gejala atau kontak erat = rujuk untuk pemeriksaan TBC', 'Kartu Bantu Pemeriksaan ILP Kemenkes RI']]]
+};
+function viewDasarPenilaian(kel) {
+  const pilih = DASAR_PENILAIAN[kel] ? kel : '';
+  const blok = k => { const d = DASAR_PENILAIAN[k]; return `<div class="kartu" id="dp-${k}"><h2>${esc(d[0])}</h2>${d[1].map(x => `<div class="dasar">
+      <b>${esc(x[0])}</b><div>${esc(x[1])}</div><small>Sumber: ${esc(x[2])}</small></div>`).join('')}</div>`; };
+  return { judul: 'Dasar penilaian & sumber', nav: 'menu', html: `
+    <div class="pesan-info">Batas Normal/Risiko di aplikasi ini mengikuti peraturan dan pedoman resmi di bawah. Label hanya penanda dini, bukan diagnosis; penentuan status dan penanganan oleh tenaga kesehatan.</div>
+    <div class="chips">${Object.keys(DASAR_PENILAIAN).map(k => `<button class="chip ${pilih === k ? 'aktif' : ''}" data-aksi="ke" data-ke="dasar-penilaian/${k}">${{ balita: 'Balita', ibu: 'Ibu hamil & nifas', remaja: 'Remaja', dewasa: 'Dewasa & lansia' }[k]}</button>`).join('')}</div>
+    ${(pilih ? [pilih] : Object.keys(DASAR_PENILAIAN)).map(blok).join('')}` };
+}
+const tautanDasar = k => `<button type="button" class="tautan" data-aksi="ke" data-ke="dasar-penilaian/${k}">${ikon('buku', 16)} Dasar penilaian & sumber</button>`;
 
 /* ---------- Ukur ---------- */
 function opsiPeriode() {
@@ -1089,7 +1151,7 @@ function tampilHasil(b, u) {
     ${u.edukasi ? `<p class="kecil">Edukasi: ${esc(u.edukasi)}</p>` : ''}
     ${[u.tbcBatuk, u.tbcDemam, u.tbcKontak].indexOf('Y') >= 0 ? '<div class="pesan-awas">Ada gejala atau kontak TBC: <b>rujuk ke puskesmas atau pustu</b> untuk pemeriksaan TBC, lalu catat di menu Risiko.</div>' : ''}
     ${layananHasilBalita(b, u)}
-    <p class="redup kecil">Status bersifat penanda; penentuan dan penanganan oleh tenaga kesehatan.${u.label === 'Merah' ? ' Sampaikan ke orang tua lalu catat rujukannya.' : ''}</p>
+    <p class="redup kecil">Status bersifat penanda; penentuan dan penanganan oleh tenaga kesehatan.${u.label === 'Merah' ? ' Sampaikan ke orang tua lalu catat rujukannya.' : ''} ${tautanDasar('balita')}</p>
     <div class="deret-tombol">
       ${berikut ? `<button class="tombol" data-aksi="formUkur" data-id="${esc(berikut.id)}">Berikutnya: ${esc(berikut.nama.split(' ').slice(0, 2).join(' '))} ${ikon('kanan', 18)}</button>` : ''}
       <button class="tombol garis" data-aksi="tutupRender">Selesai</button></div>`);
@@ -1647,7 +1709,7 @@ function tampilHasilL(l, u) {
     ${u.penyuluhan ? `<p class="kecil">Penyuluhan: ${esc(u.penyuluhan)}</p>` : ''}
     ${skriningTempo(l.id) ? `<div class="layanan-hasil"><div class="judul-kecil">Belum ada skrining dalam 12 bulan</div><div class="deret-tombol">
       <button type="button" class="tombol garis kecil" data-aksi="layananHasil" data-jenis="skriningL" data-id="${esc(l.id)}" data-p="${p}">${ikon('papan', 18)} Catat skrining tahunan</button></div></div>` : ''}
-    <p class="redup kecil">Hasil ini penanda dini, bukan diagnosis. Pemeriksaan dan pengobatan oleh tenaga kesehatan.${u.label === 'Merah' ? ' Sarankan segera ke Puskesmas.' : ''}</p>
+    <p class="redup kecil">Hasil ini penanda dini, bukan diagnosis. Pemeriksaan dan pengobatan oleh tenaga kesehatan.${u.label === 'Merah' ? ' Sarankan segera ke Puskesmas.' : ''} ${tautanDasar(kelL(l) === 'remaja' ? 'remaja' : 'dewasa')}</p>
     <div class="deret-tombol">
       ${berikut ? `<button class="tombol" data-aksi="formPeriksaL" data-id="${esc(berikut.id)}">Berikutnya: ${esc(berikut.nama.split(' ').slice(0, 2).join(' '))} ${ikon('kanan', 18)}</button>` : ''}
       <button class="tombol garis" data-aksi="tutupRender">Selesai</button></div>`);
@@ -1809,6 +1871,7 @@ async function simpanLansiaForm(f) {
       !await konfirmasi('Data mungkin ganda', esc(nama) + ' dengan tanggal lahir yang sama sudah ada. Tetap simpan?', 'Tetap simpan')) return;
   await antrekan('simpanLansia', x, (f.dataset.id ? 'Ubah ' : 'Tambah ') + ORANG_KEL[f.dataset.kel] + ' ' + nama);
   toast('Data ' + ORANG_KEL[f.dataset.kel] + ' tersimpan.');
+  if (!f.dataset.id) S.lanjut = () => formPeriksaL(id, periodeKini());
   location.hash = '#/lansia-profil/' + encodeURIComponent(id);
 }
 
@@ -1890,7 +1953,7 @@ function formSkriningL(id) {
       <div ${hbBoleh ? '' : 'hidden'}><details class="lipat" open><summary>Kadar Hb remaja putri (tahunan)</summary>
         <label class="isian"><span>Kadar Hb</span><div class="isian-angka"><input name="hb" inputmode="decimal" placeholder="0,0" value="${esc(v('hb').replace('.', ','))}"><em>g/dL</em></div></label>
         <p class="redup kecil">Hb di bawah 12 g/dL = anemia (rujuk, pastikan minum TTD); di bawah 8 g/dL anemia berat.</p></details></div>
-      <details class="lipat" ${kl === 'remaja' ? 'open' : ''}><summary>Tes hitung jari & berbisik (6 bulanan)</summary><div class="grid2">
+      <details class="lipat" ${kl === 'remaja' ? 'open' : ''}><summary>Tes hitung jari & berbisik (6 bulanan)</summary><div>
         ${TES_INDRA.map(t => `<div class="isian"><span>${esc(t.nama)}</span>${segYT(t.kode, v(t.kode), '', [['Normal', 'Normal'], ['Gangguan', 'Gangguan']])}</div>`).join('')}</div></details>
       <div ${bukanLansia ? 'hidden' : ''}><details class="lipat"><summary>Kesehatan jiwa & kognitif (bila diperiksa nakes)</summary>
         ${skor('gds', 15, 'Skor GDS-15, gejala depresi (0–15)')}${skor('amt', 10, 'Skor AMT, fungsi kognitif (0–10)')}</details></div>
@@ -2138,7 +2201,7 @@ function tampilHasilBumil(x, u) {
       ${baris('TTD bulan ini', u.ttd ? u.ttd + (u.ttdJumlah !== '' && u.ttdJumlah !== undefined ? ' (' + u.ttdJumlah + ' tablet)' : '') : '', '')}
       ${baris('Periksa ke nakes', u.anc === 'Y' ? 'Ya' : u.anc === 'T' ? 'Belum' : '', '')}</table>
     ${u.edukasi ? `<p class="kecil">Edukasi: ${esc(u.edukasi)}</p>` : ''}
-    <p class="redup kecil">Hasil ini penanda dini, bukan diagnosis. Pemeriksaan kehamilan oleh bidan/dokter.${u.label === 'Merah' ? ' Minta ibu segera ke bidan atau Puskesmas.' : ''}</p>
+    <p class="redup kecil">Hasil ini penanda dini, bukan diagnosis. Pemeriksaan kehamilan oleh bidan/dokter.${u.label === 'Merah' ? ' Minta ibu segera ke bidan atau Puskesmas.' : ''} ${tautanDasar('ibu')}</p>
     <div class="deret-tombol">
       ${berikut ? `<button class="tombol" data-aksi="formPeriksaB" data-id="${esc(berikut.id)}">Berikutnya: ${esc(berikut.nama.split(' ').slice(0, 2).join(' '))} ${ikon('kanan', 18)}</button>` : ''}
       <button class="tombol garis" data-aksi="tutupRender">Selesai</button></div>`);
@@ -2267,6 +2330,7 @@ async function simpanIbuForm(f) {
     catatan: rapiSpasi(f.catatan.value), posyandu: f.posyandu ? f.posyandu.value : S.sesi.user.posyandu };
   await antrekan('simpanIbu', x, (f.dataset.id ? 'Ubah ibu hamil ' : 'Tambah ibu hamil ') + nama);
   toast('Data ibu hamil tersimpan.');
+  if (!f.dataset.id) S.lanjut = () => formPeriksaBumil(id, periodeKini());
   location.hash = '#/bumil-profil/' + encodeURIComponent(id);
 }
 
@@ -2567,7 +2631,7 @@ function viewRisiko(tab) {
       <div class="sub dua">${esc(x.s.temuan.join('; '))}</div><div class="sub">${usiaTh(x.l.tglLahir)} th · ${rtRw(x.l)} · skrining ${fmtTgl(x.s.tgl)}${admin() && !S.pos ? ' · ' + esc(x.l.posyandu) : ''}</div></span>
       <span class="lbl Kuning">Rujuk</span></button>`).join('')}</div>` : ''; })()}
     ${!nL ? `<div class="kosong" style="padding:14px">Tidak ada ${ORANG_KEL[kelR]} yang perlu rujukan atau temuan skrining.</div>` : ''}` : ''}
-    <p class="redup kecil">Label adalah penanda dini. Penentuan status dan penanganan oleh tenaga kesehatan.</p>` };
+    <p class="redup kecil">Label adalah penanda dini. Penentuan status dan penanganan oleh tenaga kesehatan. ${tautanDasar(tab === 'ibu' ? 'ibu' : tab === 'remaja' ? 'remaja' : tab === 'balita' ? 'balita' : 'dewasa')}</p>` };
 }
 
 /* ---------- Menu ---------- */
@@ -2619,6 +2683,10 @@ function viewMenu() {
       ${item('pengguna', 'Akun kader', 'Tambah, ubah PIN, nonaktifkan', '', 'akun', 'ungu')}
       ${item('kunci', 'Kunci periode', 'Kunci bulan yang sudah dilaporkan', '', 'gembok', 'abu')}
     </div>` : ''}
+    <div class="judul-sub">Panduan</div>
+    <div class="daftar">
+      ${item('dasar-penilaian', 'Dasar penilaian & sumber', 'Batas Normal/Risiko dan peraturan acuannya', '', 'buku', 'biru')}
+    </div>
     <div class="judul-sub">Akun & aplikasi</div>
     <div class="daftar">
       ${item('', 'Mode luar ruangan: ' + (document.documentElement.classList.contains('luar') ? 'AKTIF' : 'mati'), 'Teks lebih besar & kontras tinggi untuk di bawah matahari', 'modeLuar', 'segar', 'oranye')}
@@ -2729,6 +2797,7 @@ async function simpanBalitaForm(f) {
   }
   await antrekan('simpanBalita', x, (f.dataset.id ? 'Ubah ' : 'Tambah ') + x.nama.toUpperCase());
   toast('Data balita tersimpan.');
+  if (!f.dataset.id) S.lanjut = () => formUkur(id, periodeKini());
   location.hash = '#/balita/' + encodeURIComponent(id);
 }
 
@@ -3003,7 +3072,7 @@ function viewAkun() {
 const VIEWS = {
   beranda: viewBeranda, ukur: viewUkur, imunisasi: viewImunisasi, risiko: viewRisiko, menu: viewMenu, balita: viewBalita, antrean: viewAntrean,
   'data-balita': viewDataBalita, 'tambah-balita': () => viewFormBalita(''), 'ubah-balita': viewFormBalita, dashboard: viewDashboard, pantau: viewPantau, belum: viewBelum,
-  cari: viewCari, lansia: () => viewLansia('lansia'), dewasa: () => viewLansia('dewasa'), 'tambah-dewasa': () => viewFormLansia('', 'dewasa'), remaja: () => viewLansia('remaja'), 'tambah-remaja': () => viewFormLansia('', 'remaja'), 'lansia-profil': viewProfilLansia, 'materi-lansia': viewMateriLansia, 'materi-mpasi': viewMateriMPASI,
+  cari: viewCari, 'dasar-penilaian': viewDasarPenilaian, lansia: () => viewLansia('lansia'), dewasa: () => viewLansia('dewasa'), 'tambah-dewasa': () => viewFormLansia('', 'dewasa'), remaja: () => viewLansia('remaja'), 'tambah-remaja': () => viewFormLansia('', 'remaja'), 'lansia-profil': viewProfilLansia, 'materi-lansia': viewMateriLansia, 'materi-mpasi': viewMateriMPASI,
   bumil: viewBumil, 'bumil-profil': viewProfilIbu, 'tambah-bumil': () => viewFormIbu(''), 'ubah-bumil': viewFormIbu, 'materi-bumil': viewMateriBumil, nifas: viewNifas, 'tambah-lansia': () => viewFormLansia(''), 'ubah-lansia': viewFormLansia,
   persetujuan: viewPersetujuan, laporan: viewLaporan, pengguna: viewPengguna, kunci: viewKunci, akun: viewAkun
 };

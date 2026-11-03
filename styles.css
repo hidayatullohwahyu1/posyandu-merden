@@ -39,7 +39,7 @@ a { color: var(--utama); }
 /* ---------- Bilah atas ---------- */
 .atas { position: sticky; top: 0; z-index: 20; height: calc(var(--top-h) + env(safe-area-inset-top)); background: var(--gradasi); color: #fff;
   display: flex; align-items: center; gap: 10px; padding: env(safe-area-inset-top) 12px 0 16px; }
-.atas h1 { font-size: 1.08rem; margin: 0; font-weight: 700; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .1px; }
+.atas h1 { font-size: 1.02rem; line-height: 1.22; margin: 0; font-weight: 700; flex: 1; min-width: 0; overflow-wrap: anywhere; letter-spacing: .1px; }
 .atas .kembali { background: rgba(255,255,255,.16); border: 0; color: #fff; width: 44px; height: 44px; flex: none; border-radius: 12px; display: grid; place-items: center; }
 .atas.beranda { position: relative; background: transparent; }
 .status-kirim { display: flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 600; background: rgba(255,255,255,.18);
@@ -158,7 +158,7 @@ input[disabled], select[disabled] { opacity: .6; }
 .pesan-awas { background: var(--kuning-bg); color: var(--kuning); border-radius: 14px; padding: 11px 13px; margin-bottom: 12px; font-size: .92rem; font-weight: 500; }
 
 /* chip / filter */
-.chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; margin-bottom: 10px; scrollbar-width: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 2px 6px; margin-bottom: 10px; }
 .chips::-webkit-scrollbar { display: none; }
 .chip { flex: none; border: 0; background: #fff; border-radius: 999px; padding: 9px 15px; font-size: .9rem; font-weight: 600; min-height: 40px;
   color: var(--teks-2); box-shadow: var(--bayang); }
@@ -179,13 +179,13 @@ input[disabled], select[disabled] { opacity: .6; }
 .item:last-child { border-bottom: 0; }
 .item:active { background: var(--utama-muda); }
 .item .isi { flex: 1; min-width: 0; }
-.item .nama { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item .sub { font-size: .87rem; color: var(--teks-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item .nama { font-weight: 700; overflow-wrap: anywhere; }
+.item .sub { font-size: .87rem; color: var(--teks-2); overflow-wrap: anywhere; }
 /* Daftar persetujuan: nama dan keterangan ditampilkan utuh, tombol di bawahnya */
 .item.rinci .isi { flex: 1 1 100%; }
 .item.rinci .nama, .item.rinci .sub { white-space: normal; overflow: visible; }
 .item.rinci .deret-tombol { margin-left: auto; }
-.item .sub.dua { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--teks); }
+.item .sub.dua { white-space: normal; color: var(--teks); }
 .avatar { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; flex: none; font-weight: 800; font-size: .88rem; color: #fff; }
 .avatar.L { background: linear-gradient(135deg, #4c9dff, #1468e5); } .avatar.P { background: linear-gradient(135deg, #ff7eb0, #d3306f); }
 .centang { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; }
@@ -445,3 +445,16 @@ details.lipat[open] { padding-bottom: 6px; }
 .tab-grup { gap: 2px; padding: 3px; }
 .tab-grup button { flex: 1 1 auto; padding: 0 5px; font-size: .86rem; white-space: nowrap; }
 .tab-grup .jml { min-width: 19px; height: 19px; padding: 0 5px; font-size: .7rem; }
+
+/* audit tampilan: tidak ada tulisan terpotong, target sentuh minimal 48 px */
+.tab-grup button { min-width: 44px; }
+.info-sinkron a { display: inline-flex; align-items: center; min-height: 48px; padding: 0 8px; }
+.tautan { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 2px; border: 0; background: none; color: var(--utama); font: inherit; font-weight: 600; cursor: pointer; }
+.dasar { padding: 10px 0; border-top: 1px solid var(--garis); } .dasar:first-of-type { border-top: 0; }
+.dasar div { margin: 2px 0 4px; } .dasar small { color: var(--teks-2); display: block; }
+.item-aksi { gap: 8px; } .item-aksi .buka { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; background: none; border: 0; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; min-height: 48px; }
+.item-aksi .tombol { flex: none; min-height: 44px; }
+/* tabel riwayat 7 kolom (balita, ibu, lansia) muat di layar 360 px tanpa digeser */
+.tabel-wrap table { font-size: .82rem; }
+.tabel-wrap th, .tabel-wrap td { padding: 9px 4px; }
+.tabel-wrap .lbl { padding: 2px 7px; font-size: .74rem; }
