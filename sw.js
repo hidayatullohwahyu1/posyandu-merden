@@ -1,8 +1,8 @@
 /* Service worker: menyimpan file aplikasi di HP agar bisa dibuka tanpa sinyal.
    NAIKKAN VERSI setiap kali ada file yang diubah, supaya HP kader mendapat versi baru. */
-const VERSI = 'pm-v3.1.4';
+const VERSI = 'pm-v3.1.5';
 const FILE = ['./', './index.html', './styles.css', './config.js', './who.js', './icons/logo-posyandu.webp', './gizi.js', './db.js', './app.js',
-  './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png'];
+  './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   // cache: 'reload' = ambil langsung dari server, bukan salinan lama di cache browser (GitHub Pages menyimpan 10 menit)
