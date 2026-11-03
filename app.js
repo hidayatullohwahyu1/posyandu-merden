@@ -1019,7 +1019,7 @@ function formUkur(id, periode) {
         <option value="Berbaring" ${cara === 'Berbaring' ? 'selected' : ''}>Berbaring (anjuran usia &lt; 2 tahun)</option>
         <option value="Berdiri" ${cara === 'Berdiri' ? 'selected' : ''}>Berdiri (anjuran usia ≥ 2 tahun)</option></select></label>
       <div class="grid2">
-        <label class="isian"><span>Lingkar lengan (LiLA)</span><div class="isian-angka"><input name="lila" inputmode="decimal" enterkeyhint="next" enterkeyhint="next" value="${u ? esc(angka(u.lila).replace('–', '')) : ''}" placeholder="${usia < 6 ? '–' : '0,0'}" ${usia < 6 && !(u && +u.lila) ? 'disabled' : dis}><em>cm</em></div>${usia < 6 ? '<div class="lalu redup">Diukur mulai usia 6 bulan</div>' : hint('lila', 'cm')}</label>
+        <label class="isian"><span>Lingkar lengan (LiLA)</span><div class="isian-angka"><input name="lila" inputmode="decimal" enterkeyhint="next" enterkeyhint="next" value="${u ? esc(angka(u.lila).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${usia < 6 ? `<div class="lalu redup">Usia ${usia} bln: status LiLA dinilai mulai 6 bulan</div>` : hint('lila', 'cm')}</label>
         <label class="isian"><span>Lingkar kepala</span><div class="isian-angka"><input name="lk" inputmode="decimal" enterkeyhint="next" enterkeyhint="done" value="${u ? esc(angka(u.lk).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('lk', 'cm')}</label>
       </div>
       ${(() => { const yt = (n, lb) => `<div class="isian"><span>${lb}</span>${segYT(n, u && u[n], dis)}</div>`;
@@ -1072,7 +1072,7 @@ function tampilHasil(b, u) {
       ${u.alasan ? `<ul>${u.alasan.split('; ').map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '<div class="kecil">Pertumbuhan sesuai standar.</div>'}</div>
     <table><tr><th>Indikator</th><th class="angka-sel">z-score</th><th>Status</th></tr>
       ${baris('BB/U', u.zBBU, u.stBBU)}${baris('TB/U', u.zTBU, u.stTBU)}${baris('BB/TB', u.zBBTB, u.stBBTB)}${baris('LK/U', u.zLKU, u.stLKU)}
-      ${u.stLILA ? `<tr><td>LiLA</td><td class="angka-sel">${angka(u.lila)} cm</td><td>${esc(u.stLILA)}</td></tr>` : ''}
+      ${+u.lila ? `<tr><td>LiLA</td><td class="angka-sel">${angka(u.lila)} cm</td><td>${esc(u.stLILA || 'dinilai mulai 6 bln')}</td></tr>` : ''}
       ${u.nt ? `<tr><td>Naik BB</td><td class="angka-sel">${u.selisih !== '' ? angka(u.selisih) + ' g' : ''}</td><td>${{ N: 'Naik', T: 'Tidak naik', O: 'Bulan lalu tidak ditimbang', B: 'Baru pertama ditimbang' }[u.nt] || ''}</td></tr>` : ''}
     </table>
     ${(() => { const us = usiaBulan(b.tglLahir, u.tglUkur); return us >= 6 && us <= 23 && String(u.edukasi || '').indexOf('MP-ASI') < 0
