@@ -235,7 +235,7 @@ function olahData(raw) {
   };
 }
 const KOL_PERIKSA_L = ['id', 'periode', 'tgl', 'bb', 'tb', 'imt', 'stIMT', 'lp', 'stLP', 'sistol', 'diastol', 'stTD', 'obat', 'merokok', 'label', 'alasan', 'diubahPada', 'petugas',
-  'gd', 'jenisGD', 'stGD', 'kol', 'stKol', 'au', 'stAU', 'penyuluhan', 'lila', 'tbcBatuk', 'tbcDemam', 'tbcKontak', 'kontrasepsi', 'rujuk'];
+  'gd', 'jenisGD', 'stGD', 'kol', 'stKol', 'au', 'stAU', 'penyuluhan', 'lila', 'tbcBatuk', 'tbcDemam', 'tbcKontak', 'kontrasepsi', 'rujuk', 'tbcBB'];
 const kpspObj = r => ({ usia: +r[1], tgl: r[2], ya: +r[3], hasil: r[4], tdd: r[5], tdl: r[6], catatan: r[7], id: r[8] });
 const pd3iObj = r => ({ idLapor: r[0], id: r[1], penyakit: r[2], tglGejala: r[3], gejala: r[4], imun: r[5], status: r[6], tl: r[7], pelapor: r[8], tglLapor: r[9] });
 function barisKeUkur(arr) { const o = {}; S.dasar.kolUkur.forEach((k, i) => { o[k] = arr[i]; }); return o; }
@@ -325,12 +325,12 @@ function terapkanLokal(d, it) {
     case 'simpanPeriksaLansia': {
       const l = d.lansiaById[x.id]; if (!l) return;
       const h = hitungLansia({ jk: l.jk, bb: x.bb, tb: x.tb, lp: x.lp, sistol: x.sistol, diastol: x.diastol, merokok: x.merokok, obat: x.obat, riwayatHT: l.rHT, riwayatDM: l.rDM,
-        gd: x.gd, jenisGD: x.jenisGD, kol: x.kol, au: x.au, lila: x.lila, tbcBatuk: x.tbcBatuk, tbcDemam: x.tbcDemam, tbcKontak: x.tbcKontak });
+        gd: x.gd, jenisGD: x.jenisGD, kol: x.kol, au: x.au, lila: x.lila, tbcBatuk: x.tbcBatuk, tbcDemam: x.tbcDemam, tbcKontak: x.tbcKontak, tbcBB: x.tbcBB });
       (d.periksaL[l.id] = d.periksaL[l.id] || {})[x.periode] = { id: l.id, periode: x.periode, tgl: x.tgl, bb: x.bb || '', tb: x.tb || '', imt: h.imt === null ? '' : h.imt,
         stIMT: h.stIMT, lp: x.lp || '', stLP: h.stLP, sistol: x.sistol || '', diastol: x.diastol || '', stTD: h.stTD, obat: x.obat, merokok: x.merokok,
         label: h.label, alasan: h.alasan.join('; '), diubahPada: '', petugas: S.sesi ? S.sesi.user.username : '',
         gd: x.gd || '', jenisGD: x.gd ? x.jenisGD : '', stGD: h.stGD, kol: x.kol || '', stKol: h.stKol, au: x.au || '', stAU: h.stAU, penyuluhan: x.penyuluhan,
-        lila: x.lila || '', tbcBatuk: x.tbcBatuk || '', tbcDemam: x.tbcDemam || '', tbcKontak: x.tbcKontak || '', kontrasepsi: x.kontrasepsi || '', rujuk: x.rujuk || '', _lokal: true };
+        lila: x.lila || '', tbcBatuk: x.tbcBatuk || '', tbcDemam: x.tbcDemam || '', tbcKontak: x.tbcKontak || '', kontrasepsi: x.kontrasepsi || '', rujuk: x.rujuk || '', tbcBB: x.tbcBB || '', _lokal: true };
       break; }
     case 'simpanIbu': {
       const i = d.ibuById[x.id];
@@ -1511,6 +1511,11 @@ function isiDaftarLansia() {
     </button>`; }).join('')}</div>` : `<div class="kosong">${f === 'skrining' ? `Semua ${orang} sudah diskrining dalam 12 bulan terakhir.` : f === 'belum' && !q ? (total ? `Semua ${orang} sudah diperiksa. Terima kasih!` : `Belum ada ${orang} terdaftar. Tekan Tambah saat warga hadir.`) : `Tidak ada ${orang} yang cocok.`}</div>`);
 }
 
+/* Petunjuk isian "BB tetap/turun 2 bulan berturut-turut": BB dua bulan sebelumnya dari catatan pemeriksaan */
+function riwayatBBL(id, periode) {
+  const bb = [-2, -1].map(n => { const r = periksaDi(id, geserPeriode(periode, n)); return r && +r.bb > 0 ? r : null; }).filter(Boolean);
+  return bb.length ? `<div class="lalu">BB ${bb.map(r => namaPeriode(r.periode).split(' ')[0].slice(0, 3) + ' ' + angka(r.bb)).join(' → ')} kg</div>` : '<div class="lalu redup">Belum ada BB bulan lalu</div>';
+}
 function formPeriksaL(id, periode) {
   const l = S.d.lansiaById[id]; if (!l) return;
   periode = periode || S.periodeL || periodeKini();
@@ -1556,6 +1561,9 @@ function formPeriksaL(id, periode) {
       <div class="grid2">
         <label class="isian"><span>Batuk terus-menerus</span>${yt('tbcBatuk', u ? u.tbcBatuk : '')}</label>
         <label class="isian"><span>Demam ≥ 2 minggu</span>${yt('tbcDemam', u ? u.tbcDemam : '')}</label>
+      </div>
+      <label class="isian"><span>BB tetap atau turun 2 bulan berturut-turut</span>${yt('tbcBB', u ? u.tbcBB : '')}${riwayatBBL(id, periode)}</label>
+      <div class="grid2">
         <label class="isian"><span>Kontak erat pasien TBC</span>${yt('tbcKontak', u ? u.tbcKontak : '')}</label>
         <label class="isian"><span>Memakai alat kontrasepsi</span>${yt('kontrasepsi', u ? u.kontrasepsi : (lalu ? lalu.kontrasepsi : ''))}</label>
       </div>
@@ -1577,7 +1585,7 @@ function formPeriksaL(id, periode) {
 async function simpanPeriksaL(f) {
   const id = f.dataset.id, periode = f.dataset.periode, l = S.d.lansiaById[id];
   const x = { id, periode, tgl: f.tgl.value, obat: f.obat.value, merokok: f.merokok.value, jenisGD: f.jenisGD.value,
-    tbcBatuk: f.tbcBatuk.value, tbcDemam: f.tbcDemam.value, tbcKontak: f.tbcKontak.value, kontrasepsi: f.kontrasepsi.value, rujuk: f.rujuk.value,
+    tbcBatuk: f.tbcBatuk.value, tbcDemam: f.tbcDemam.value, tbcKontak: f.tbcKontak.value, tbcBB: f.tbcBB.value, kontrasepsi: f.kontrasepsi.value, rujuk: f.rujuk.value,
     penyuluhan: Array.from(f.querySelectorAll('input[name=ply]:checked')).map(i => i.value).join(', ') };
   const nama = { bb: 'Berat badan', tb: 'Tinggi badan', lp: 'Lingkar perut', lila: 'LiLA', sistol: 'Sistol', diastol: 'Diastol', gd: 'Gula darah', kol: 'Kolesterol', au: 'Asam urat' };
   for (const k of Object.keys(nama)) {

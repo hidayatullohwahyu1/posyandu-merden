@@ -277,7 +277,7 @@ function hitungLansia(p) {
   if (stLP === 'Obesitas sentral') kuning.push('Lingkar perut berlebih (' + String(lp).replace('.', ',') + ' cm)');
   if (p.merokok === 'Y') kuning.push('Merokok');
   if (+p.lila > 0 && +p.lila < 23.5) kuning.push('LiLA kurang dari 23,5 cm (' + String(p.lila).replace('.', ',') + ' cm), risiko kurang gizi');
-  if (p.tbcBatuk === 'Y' || p.tbcDemam === 'Y' || p.tbcKontak === 'Y') kuning.push('Ada gejala atau kontak TBC — rujuk untuk pemeriksaan TBC');
+  if (p.tbcBatuk === 'Y' || p.tbcDemam === 'Y' || p.tbcKontak === 'Y' || p.tbcBB === 'Y') kuning.push('Ada gejala atau kontak TBC — rujuk untuk pemeriksaan TBC');
   var riw = [];
   if (p.riwayatHT === 'Y') riw.push('hipertensi');
   if (p.riwayatDM === 'Y') riw.push('diabetes');
