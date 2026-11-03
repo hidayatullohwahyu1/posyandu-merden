@@ -91,6 +91,24 @@ function statusBBU(z) { return z === null ? '' : z < -3 ? 'BB sangat kurang' : z
 function statusTBU(z) { return z === null ? '' : z < -3 ? 'Sangat pendek' : z < -2 ? 'Pendek' : z <= 3 ? 'Normal' : 'Tinggi'; }
 function statusBBTB(z) { return z === null ? '' : z < -3 ? 'Gizi buruk' : z < -2 ? 'Gizi kurang' : z <= 1 ? 'Gizi baik' : z <= 2 ? 'Berisiko gizi lebih' : z <= 3 ? 'Gizi lebih' : 'Obesitas'; }
 function statusLKU(z) { return z === null ? '' : z < -2 ? 'Mikrosefali' : z > 2 ? 'Makrosefali' : 'Normal'; }
+/* Rentang ideal Buku KIA (cetakan 2024, tabel pertumbuhan anak): berat dan panjang/tinggi badan antara −2 SD dan +1 SD
+   standar WHO 2006 — sama persis dengan tabel Buku KIA umur 0–24 bulan (diuji). bln = umur bulan penuh 0–60;
+   ind 'bb' atau 'tb' (panjang badan s.d. 24 bulan, tinggi badan sesudahnya). Hasil [bawah, atas] atau null. */
+function rentangIdealKIA(jk, bln, ind) {
+  var T = WHO[jk === 'P' ? 'P' : 'L'];
+  bln = Math.floor(bln);
+  if (!(bln >= 0) || bln > 60) return null;
+  var lms = ind === 'bb' ? T.bbu[bln] : bln <= 24 ? T.pbu[bln] : T.tbu[bln - 24];
+  if (!lms) return null;
+  var r = function (z) { return Math.round(_nilaiSD(lms[0], lms[1], lms[2], z) * 10) / 10; };
+  return [r(-2), r(1)];
+}
+/* Nilai terhadap rentang ideal Buku KIA: 'Ideal' / 'Di bawah ideal' / 'Di atas ideal' ('' bila tidak dinilai) */
+function idealKIA(nilai, rentang) {
+  var v = +nilai;
+  if (!(v > 0) || !rentang) return '';
+  return v < rentang[0] ? 'Di bawah ideal' : v > rentang[1] ? 'Di atas ideal' : 'Ideal';
+}
 function statusLILA(lila, bln) { return !lila || bln < 6 ? '' : lila < 11.5 ? 'Gizi buruk' : lila < 12.5 ? 'Gizi kurang' : 'Normal'; }
 
 /* ---------- Naik berat badan: N / T / O / B ----------

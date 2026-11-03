@@ -957,6 +957,8 @@ function isiHasilCari() {
 /* ---------- Dasar penilaian & sumber: batas yang dipakai aplikasi (sama dengan gizi.js) dan rujukan resminya ---------- */
 const DASAR_PENILAIAN = {
   balita: ['Balita 0–59 bulan', [
+    ['Rentang ideal Buku KIA 2024', 'Berat dan panjang/tinggi badan ideal = antara −2 SD dan +1 SD standar WHO 2006 (sama persis dengan tabel pertumbuhan anak 0–2 tahun di Buku KIA; aplikasi memakai rumus yang sama sampai 5 tahun). Ditampilkan sebagai Ideal / Di bawah ideal / Di atas ideal',
+      'Buku Kesehatan Ibu dan Anak (KIA) Kemenkes RI cetakan 2024'],
     ['BB/U (berat menurut umur)', 'Sangat kurang < −3 SD · Kurang −3 s.d. < −2 SD · Normal −2 s.d. +1 SD · Risiko BB lebih > +1 SD',
       'Permenkes RI No. 2 Tahun 2020 tentang Standar Antropometri Anak (WHO Child Growth Standards 2006)'],
     ['PB/U atau TB/U (tinggi menurut umur)', 'Sangat pendek < −3 SD · Pendek −3 s.d. < −2 SD · Normal −2 s.d. +3 SD · Tinggi > +3 SD', 'Permenkes RI No. 2 Tahun 2020'],
@@ -1079,8 +1081,8 @@ function formUkur(id, periode) {
     <form id="fUkur" data-id="${esc(id)}" data-periode="${periode}" data-ada="${u ? 1 : 0}" data-base="${u ? esc(u.diubahPada || '') : ''}">
       <label class="isian"><span>Tanggal ukur</span><input type="date" name="tglUkur" value="${tglDefault}" min="${awalPeriode(periode)}" max="${maxTgl}" required ${dis}></label>
       <div class="grid2">
-        <label class="isian"><span>Berat badan</span><div class="isian-angka"><input name="bb" inputmode="decimal" enterkeyhint="next" enterkeyhint="next" value="${u ? esc(angka(u.bb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>kg</em></div>${hint('bb', 'kg')}</label>
-        <label class="isian"><span>${usia < 24 ? 'Panjang' : 'Tinggi'} badan</span><div class="isian-angka"><input name="tb" inputmode="decimal" enterkeyhint="next" enterkeyhint="next" value="${u ? esc(angka(u.tb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('tb', 'cm')}</label>
+        <label class="isian"><span>Berat badan</span><div class="isian-angka"><input name="bb" inputmode="decimal" enterkeyhint="next" enterkeyhint="next" value="${u ? esc(angka(u.bb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>kg</em></div>${hint('bb', 'kg')}<div class="ideal" data-ideal="bb"></div></label>
+        <label class="isian"><span>${usia < 24 ? 'Panjang' : 'Tinggi'} badan</span><div class="isian-angka"><input name="tb" inputmode="decimal" enterkeyhint="next" enterkeyhint="next" value="${u ? esc(angka(u.tb).replace('–', '')) : ''}" placeholder="0,0" ${dis}><em>cm</em></div>${hint('tb', 'cm')}<div class="ideal" data-ideal="tb"></div></label>
       </div>
       <label class="isian"><span>Cara ukur panjang/tinggi</span><select name="cara" ${dis}>
         <option value="Berbaring" ${cara === 'Berbaring' ? 'selected' : ''}>Berbaring (anjuran usia &lt; 2 tahun)</option>
@@ -1103,7 +1105,18 @@ function formUkur(id, periode) {
         <button type="button" class="tombol garis" data-aksi="tutup">Batal</button>
         <button type="button" class="tombol garis" data-aksi="ke" data-ke="balita/${esc(id)}">Profil</button></div>`
       : `<div class="deret-tombol"><button type="button" class="tombol garis" data-aksi="tutup">Tutup</button><button type="button" class="tombol garis" data-aksi="ke" data-ke="balita/${esc(id)}">Profil</button></div>`}
-    </form>`, el => { const i = el.querySelector('input[name=bb]'); if (i && !i.value && boleh.ok) setTimeout(() => i.focus(), 250); });
+    </form>`, el => {
+    const i = el.querySelector('input[name=bb]'); if (i && !i.value && boleh.ok) setTimeout(() => i.focus(), 250);
+    // rentang ideal Buku KIA 2024 dan tandanya, diperbarui saat angka/tanggal/cara ukur berubah
+    const f = el.querySelector('form'), segar = () => {
+      const angkaIsi = k => { const v = bacaAngka(f[k].value); return Number.isNaN(v) || v === '' ? 0 : v; };
+      const n = nilaiKIA(b, { tglUkur: f.tglUkur.value || hariIni(), bb: angkaIsi('bb'), tb: angkaIsi('tb'), cara: f.cara.value });
+      ['bb', 'tb'].forEach((k, j) => { const x = n[j], d = el.querySelector(`[data-ideal=${k}]`); if (!d) return;
+        d.className = 'ideal' + (x && x.status ? (x.status === 'Ideal' ? ' ok' : ' luar') : '');
+        d.textContent = !x ? '' : x.status ? (x.status === 'Ideal' ? '✓ ' : '') + x.status + ' (KIA: ' + teksRentang(x.rentang, x.sat) + ')' : 'Ideal menurut KIA: ' + teksRentang(x.rentang, x.sat); });
+    };
+    f.addEventListener('input', segar); f.addEventListener('change', segar); segar();
+  });
 }
 
 async function simpanUkur(f) {
@@ -1128,6 +1141,21 @@ async function simpanUkur(f) {
   tampilHasil(b, u);
 }
 
+/* Penilaian Buku KIA 2024 satu pengukuran: [{ind, nilai, rentang, status}] untuk BB dan PB/TB (umur 0–60 bulan) */
+function nilaiKIA(b, u) {
+  const bln = usiaBulan(b.tglLahir, u.tglUkur || hariIni()); if (!(bln >= 0) || bln > 60) return [];
+  let tb = +u.tb || 0;
+  if (tb && bln < 24 && u.cara === 'Berdiri') tb += 0.7;
+  if (tb && bln >= 24 && u.cara === 'Berbaring') tb -= 0.7;
+  return [['bb', +u.bb, 'Berat badan', 'kg'], ['tb', tb, bln <= 24 ? 'Panjang badan' : 'Tinggi badan', 'cm']].map(x => {
+    const r = rentangIdealKIA(b.jk, bln, x[0]); return { ind: x[2], sat: x[3], nilai: x[1], rentang: r, status: idealKIA(x[1], r) }; }).filter(x => x.rentang);
+}
+const teksRentang = (r, sat) => angka(r[0]) + '–' + angka(r[1]) + ' ' + sat;
+function kotakKIA(b, u) {
+  const n = nilaiKIA(b, u).filter(x => x.status); if (!n.length) return '';
+  return `<div class="kia"><b>Menurut Buku KIA 2024</b>${n.map(x => `<div class="baris antara"><span>${x.ind} ${angka(Math.round(x.nilai * 10) / 10)} ${x.sat}
+    <small>ideal ${teksRentang(x.rentang, x.sat)}</small></span><span class="lbl-kia ${x.status === 'Ideal' ? 'ok' : 'luar'}">${x.status}</span></div>`).join('')}</div>`;
+}
 function tampilHasil(b, u) {
   const p = u.periode;
   const berikut = sasaran(p).filter(z => !ukurDi(z.id, p) && z.id !== b.id).sort(urutNama)
@@ -1142,6 +1170,7 @@ function tampilHasil(b, u) {
       ${+u.lila ? `<tr><td>LiLA</td><td class="angka-sel">${angka(u.lila)} cm</td><td>${esc(u.stLILA || 'dinilai mulai 6 bln')}</td></tr>` : ''}
       ${u.nt ? `<tr><td>Naik BB</td><td class="angka-sel">${u.selisih !== '' ? angka(u.selisih) + ' g' : ''}</td><td>${{ N: 'Naik', T: 'Tidak naik', O: 'Bulan lalu tidak ditimbang', B: 'Baru pertama ditimbang' }[u.nt] || ''}</td></tr>` : ''}
     </table>
+    ${kotakKIA(b, u)}
     ${(() => { const us = usiaBulan(b.tglLahir, u.tglUkur); return us >= 6 && us <= 23 && String(u.edukasi || '').indexOf('MP-ASI') < 0
       ? `<div class="pesan-info">Usia MP-ASI: sampaikan pentingnya <b>protein hewani setiap hari</b> (telur, ikan, ayam, hati). <a href="#/materi-mpasi">Lihat bahan edukasi</a></div>` : ''; })()}
     ${u.edukasi ? `<p class="kecil">Edukasi: ${esc(u.edukasi)}</p>` : ''}
@@ -1227,6 +1256,7 @@ function viewBalita(id) {
         <div class="angka"><b>${angka(t.lila)}</b><span>LiLA (cm) · ${esc(t.stLILA || '–')}</span></div>
         <div class="angka"><b>${angka(t.lk)}</b><span>LK (cm) · ${esc(t.stLKU || '–')}</span></div></div>
       ${t.stBBTB ? `<p class="kecil" style="margin:10px 0 0">BB/TB: <b>${esc(t.stBBTB)}</b></p>` : ''}
+      ${kotakKIA(b, t)}
       ${t.alasan ? `<p class="kecil" style="margin:6px 0 0">${esc(t.alasan)}</p>` : ''}</div>` : ''}
     <span id="b-pertumbuhan"></span>
     ${rows.length ? `<div class="kartu"><h2>Grafik pertumbuhan</h2>
