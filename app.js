@@ -1626,6 +1626,12 @@ function tampilHasilL(l, u) {
       <button class="tombol garis" data-aksi="tutupRender">Selesai</button></div>`);
 }
 
+/* Isian data diri yang dipakai Kartu Bantu tetapi belum dijawab (agar kartu digital terisi lengkap) */
+const ISIAN_KARTU_L = [['hp', 'No HP'], ['kawin', 'Status perkawinan'], ['kerja', 'Pekerjaan'], ['hpKel', 'No HP keluarga'],
+  ['rHT', 'Riwayat hipertensi'], ['rDM', 'Riwayat diabetes'], ['rStroke', 'Riwayat stroke'], ['rJantung', 'Riwayat jantung'], ['rAsma', 'Riwayat asma'],
+  ['rkHT', 'Hipertensi keluarga'], ['rkDM', 'DM keluarga'], ['rkStroke', 'Stroke keluarga'], ['rkJantung', 'Jantung keluarga'], ['rkAsma', 'Asma keluarga'],
+  ['gula', 'Konsumsi tinggi gula'], ['garam', 'Konsumsi tinggi garam'], ['lemak', 'Konsumsi tinggi lemak']];
+const kurangKartuL = l => ISIAN_KARTU_L.filter(k => !String(l[k[0]] || '').trim());
 function viewProfilLansia(id) {
   const l = S.d.lansiaById[id];
   if (!l) return { judul: 'Lansia / Usia Dewasa', nav: 'menu', html: '<div class="kosong">Data tidak ditemukan. Mungkin sudah dipindah atau belum tersinkron.</div>' };
@@ -1648,6 +1654,9 @@ function viewProfilLansia(id) {
       ${aktif ? tombolPindah(kelL(l), id) : ''}
       ${aktif && !l.usulKeluar ? `<button class="tautan-bahaya" data-aksi="keluarL" data-id="${esc(id)}">Keluarkan dari daftar (pindah/meninggal)</button>` : ''}
     </div>
+    ${(() => { const kr = kurangKartuL(l); return kr.length && aktif ? `<div class="pesan-awas"><b>Kartu Bantu belum lengkap: ${kr.length} isian kosong</b>
+      <div class="kecil" style="margin:4px 0 8px">${kr.map(k => k[1]).join(', ')}</div>
+      <button class="tombol kecil" data-aksi="ke" data-ke="ubah-lansia/${esc(id)}">Lengkapi data</button></div>` : ''; })()}
     ${t ? `<div class="kartu"><div class="baris antara"><h2 style="margin:0">Terakhir: ${namaPeriode(t.periode)}</h2><span class="lbl ${t.label}">${t.label}</span></div>
       <div class="grid2" style="margin-top:10px">
         <div class="angka"><b>${tdTeks(t)}</b><span>Tekanan darah · ${esc(t.stTD || '–')}</span></div>
@@ -1704,7 +1713,7 @@ function viewFormLansia(id, kelBaru) {
         <label class="isian"><span>Riwayat hipertensi</span>${yt('rHT', l ? l.rHT : '')}</label>
         <label class="isian"><span>Riwayat diabetes</span>${yt('rDM', l ? l.rDM : '')}</label>
       </div>
-      <details class="lipat"><summary>Data tambahan untuk Kartu Bantu <span class="redup kecil">(boleh dilengkapi nanti)</span></summary>
+      <details class="lipat" ${l && kurangKartuL(l).length ? 'open' : ''}><summary>Data tambahan untuk Kartu Bantu <span class="redup kecil">(boleh dilengkapi nanti)</span></summary>
       <div class="grid2">
         <label class="isian"><span>Status perkawinan</span><select name="kawin"><option value="">Tidak tahu</option>${['Menikah', 'Tidak menikah'].map(k => `<option ${l && l.kawin === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>
         <label class="isian"><span>Pekerjaan</span><input name="kerja" maxlength="40" value="${v('kerja')}" autocapitalize="characters"></label>
