@@ -104,7 +104,8 @@ const IKON = {
   lansia: '<circle cx="10" cy="5" r="2.5"/><path d="M10 8.5l-2 5 3 2.5V21M8 13.5L6 21M10 8.5l3 3h3M17 11.5V21"/>',
   buku: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/>',
   nadi: '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
-  ibu: '<circle cx="11" cy="4.5" r="2.5"/><path d="M9 21v-5.5L7.5 11a3.5 3.5 0 0 1 3.5-3.5c1.2 0 2.2.6 2.8 1.6M13.8 9.1a4 4 0 0 1 .7 7.4H11M13 21v-4.5"/>',
+  ibu: '<circle cx="10" cy="4" r="2.4"/><path d="M9.2 7.2C7.8 8.4 7.4 10 7.6 11.8L8 21M10.8 7.2c1 .7 1.6 1.7 1.6 2.9 2.6.6 4 2.3 4 4.3 0 2-1.6 3.5-4 3.6L12.6 21"/><path d="M10 13.2h2.4"/>',
+  ibuBayi: '<circle cx="9" cy="5" r="2.6"/><path d="M4 21v-3.5A5 5 0 0 1 9 12.5c1.6 0 2.9.7 3.7 1.8"/><circle cx="16" cy="11" r="2.2"/><path d="M11 16.5c1.4 1.4 3.2 2.1 5.2 2.1 1.8 0 3.3-.7 4.3-1.8"/>',
   daftar: '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>'
 };
 const ikon = (n, s = 24) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IKON[n]}</svg>`;
@@ -784,12 +785,18 @@ function segarkan() {
 }
 
 /* ---------- Login ---------- */
+/* Logo aplikasi: rumah (posyandu) dengan hati (layanan kesehatan keluarga). SVG di dalam aplikasi, tetap tampil tanpa internet. */
+const LOGO_SVG = `<svg class="logo-besar" viewBox="0 0 64 64" role="img" aria-label="Logo Posyandu"><rect width="64" height="64" rx="16" fill="#fff"/>
+  <path d="M14 30 32 15l18 15" fill="none" stroke="#1468e5" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M19 28v20a3 3 0 0 0 3 3h20a3 3 0 0 0 3-3V28" fill="none" stroke="#1468e5" stroke-width="4.5" stroke-linejoin="round"/>
+  <path d="M32 46s-8.5-5-8.5-10.6a4.6 4.6 0 0 1 8.5-2.5 4.6 4.6 0 0 1 8.5 2.5C40.5 41 32 46 32 46z" fill="#ff5b93"/></svg>`;
+const KELOMPOK_LAYANAN = [['Balita', 'bayi', 'w-biru'], ['Ibu hamil', 'ibu', 'w-pink'], ['Usia dewasa', 'orang', 'w-ungu'], ['Lansia', 'lansia', 'w-hijau']];
 function viewLogin() {
   return `<div class="halaman-login">
     <div class="login-atas">
-      <img class="logo-besar" src="icons/icon-192.png" alt="">
+      ${LOGO_SVG}
       <h1>${esc(C.NAMA)}</h1>
-      <p>Layanan posyandu ILP ibu hamil, balita &amp; lansia ${esc(C.DESA)}</p>
+      <p>Posyandu ILP ${esc(C.DESA)}: balita, ibu hamil, usia dewasa &amp; lansia</p>
     </div>
     <div class="login-kartu">
     <h2 style="margin:0 0 14px;font-size:1.1rem">Masuk ke akun Anda</h2>
@@ -801,6 +808,7 @@ function viewLogin() {
       <button class="tombol penuh" type="submit">Masuk</button>
     </form>
     </div>
+    <div class="layanan-login">${KELOMPOK_LAYANAN.map(k => `<span><i class="bulat ${k[2]}">${ikon(k[1], 20)}</i>${k[0]}</span>`).join('')}</div>
     <div class="login-bawah">
     ${S.pasang ? `<button class="tombol garis penuh" data-aksi="pasang">${ikon('awan', 20)} Pasang aplikasi di HP</button>` : ''}
     <p class="redup kecil" style="text-align:center;margin-top:20px">Lupa PIN? Hubungi admin desa · Versi ${esc(C.VERSI)}</p>
@@ -850,7 +858,11 @@ function viewBeranda() {
   // Satu kartu tugas per kelompok sasaran, warna tetap: balita biru, ibu merah muda, lansia hijau.
   // Tiap fitur hanya punya satu pintu di Beranda; daftar lengkap ada di Menu.
   const kartuTugas = (kls, warna, ik, judul, sudah, total, satuan, belumTeks, selesaiTeks, aksi) => {
-    const pc = total ? Math.round(sudah / total * 100) : 0;
+    // belum ada sasaran: cukup satu baris dengan tombol Tambah (tidak memakan satu layar)
+    const tambah = aksi[aksi.length - 1];
+    if (!total) return `<div class="kartu-tipis ${kls}"><span class="ik-grup ${warna}">${ikon(ik, 18)}</span><span class="isi"><b>${judul[0]}</b><span class="redup kecil">${belumTeks[1] || 'Belum ada sasaran terdata.'}</span></span>
+      <button class="tombol garis kecil" data-aksi="${tambah[0]}" data-ke="${tambah[1]}">${ikon('tambah', 18)} Tambah</button></div>`;
+    const pc = Math.round(sudah / total * 100);
     return `<div class="hero-kartu ${kls}">
       <div class="baris antara"><span class="judul-grup"><span class="ik-grup ${warna}">${ikon(ik, 18)}</span><span>${judul[0]}<span class="label-kecil">${judul[1]} ${esc(namaPeriode(P))}</span></span></span><span class="persen">${pc}%</span></div>
       <div class="besar">${sudah} <small>/ ${total} ${satuan}</small></div>
@@ -885,18 +897,50 @@ function viewBeranda() {
     ${S.pasang ? `<div class="banner biru"><span class="bulat w-tosca" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;color:#fff">${ikon('awan', 20)}</span><div class="isi"><b>Pasang di layar HP</b><div class="kecil">Agar cukup mengetuk ikon.</div></div><button class="tombol kecil" data-aksi="pasang">Pasang</button></div>` : ''}
     ${pd3iAktif().length ? `<div class="pesan-galat"><b>${pd3iAktif().length} suspek PD3I aktif.</b> <a href="#/risiko/balita">Lihat</a> — pastikan sudah diteruskan ke Puskesmas.</div>` : ''}
     ${g ? `<div class="pesan-galat">${g} kiriman ditolak server. <a href="#/antrean">Periksa</a></div>` : m ? `<div class="pesan-awas">${m} data belum terkirim. Akan terkirim otomatis saat ada sinyal.</div>` : ''}
+    <button class="cari-semua" data-aksi="ke" data-ke="cari">${ikon('cari', 20)}<span>Cari warga: balita, ibu, dewasa, lansia</span></button>
+    ${perhatian ? `<div class="judul-bagian">Perlu perhatian</div><div class="grid2 perhatian">${perhatian}</div>` : ''}
+    <div class="judul-bagian">Tugas bulan ini</div>
     ${kartuTugas('balita', 'w-biru', 'bayi', ['Balita', 'Penimbangan'], sudah, sas.length, 'balita', ['balita belum diukur bulan ini', 'Belum ada balita terdata.'],
       'Semua balita sudah diukur. Terima kasih!', [['ke', 'ukur', 'ukur', 'Ukur'], ['ke', 'imunisasi', 'suntik', 'Imunisasi', imunJT], ['ke', 'tambah-balita', 'tambah', 'Tambah']])}
-    ${si.length || !admin() ? kartuTugas('ibu', 'w-pink', 'ibu', ['Ibu hamil', 'Kunjungan'], sdI, si.length, 'ibu hamil', ['ibu hamil belum dikunjungi bulan ini', 'Belum ada ibu hamil terdata. Tambahkan lewat tombol Tambah.'],
+    ${si.length || !admin() ? kartuTugas('ibu', 'w-pink', 'ibu', ['Ibu hamil', 'Kunjungan'], sdI, si.length, 'ibu hamil', ['ibu hamil belum dikunjungi bulan ini', 'Belum ada ibu hamil terdata.'],
       'Semua ibu hamil sudah dikunjungi. Terima kasih!', [['ke', 'bumil', 'ibu', 'Kunjungi'], ['keHPL', '', 'jam', 'HPL dekat', hplDekat], ['ke', 'tambah-bumil', 'tambah', 'Tambah']]) : ''}
-    ${sd.length || !admin() ? kartuTugas('dewasa', 'w-tosca', 'orang', ['Usia dewasa 18–59', 'Pemeriksaan'], sdD, sd.length, 'warga', ['warga terdaftar belum diperiksa bulan ini', 'Belum ada warga usia dewasa terdaftar. Tekan Tambah saat warga hadir.'],
+    ${sd.length || !admin() ? kartuTugas('dewasa', 'w-ungu', 'orang', ['Usia dewasa 18–59', 'Pemeriksaan'], sdD, sd.length, 'warga', ['warga terdaftar belum diperiksa bulan ini', 'Daftarkan warga 18–59 tahun saat hadir.'],
       'Semua warga terdaftar sudah diperiksa. Terima kasih!', [['ke', 'dewasa', 'nadi', 'Periksa'], ['keSkriningD', '', 'papan', 'Skrining'], ['ke', 'tambah-dewasa', 'tambah', 'Tambah']]) : ''}
-    ${sl.length ? kartuTugas('lansia', 'w-hijau', 'lansia', ['Lansia', 'Pemeriksaan'], sdL, sl.length, 'lansia', ['lansia belum diperiksa bulan ini', ''],
+    ${sl.length || !admin() ? kartuTugas('lansia', 'w-hijau', 'lansia', ['Lansia', 'Pemeriksaan'], sdL, sl.length, 'lansia', ['lansia belum diperiksa bulan ini', 'Belum ada lansia terdata.'],
       'Semua lansia sudah diperiksa. Terima kasih!', [['ke', 'lansia', 'nadi', 'Periksa'], ['keSkrining', '', 'papan', 'Skrining', skrTempo], ['ke', 'tambah-lansia', 'tambah', 'Tambah']]) : ''}
-    <div class="judul-bagian">Perlu perhatian</div>
-    ${perhatian ? `<div class="grid2">${perhatian}</div>` : '<div class="kartu redup" style="text-align:center">Tidak ada sasaran yang perlu perhatian saat ini.</div>'}
     ${admin() ? `<div class="judul-bagian">Admin desa</div><div class="layanan tiga">${alatAdmin.map(x => tombolBulat(x[0], x[1], x[2], x[3], x[4], x[5])).join('')}</div>` : ''}
     <p class="info-sinkron">Sinkron terakhir: ${menitSinkron < 1 ? 'baru saja' : menitSinkron < 60 ? menitSinkron + ' menit lalu' : fmtTgl(String(S.dasar.waktu).slice(0, 10))} · <a href="#/menu">Semua menu</a></p>` };
+}
+
+/* ---------- Cari warga di semua kelompok (meja pendaftaran) ---------- */
+function viewCari() {
+  return { judul: 'Cari warga', nav: 'beranda', html: `
+    <div class="cari">${ikon('cari', 20)}<input id="cariSemua" type="search" placeholder="Nama, nama ibu, NIK, atau RT" value="${esc(S.cariSemua || '')}" autocomplete="off" autofocus></div>
+    <p class="redup kecil" style="margin:0 4px 10px">Mencari di balita, ibu hamil/nifas, usia dewasa, dan lansia sekaligus.</p>
+    <div id="hasilCari"></div>`,
+    setelah: () => { isiHasilCari(); const c = $('#cariSemua'); c.addEventListener('input', () => { S.cariSemua = c.value; isiHasilCari(); }); setTimeout(() => c.focus(), 200); } };
+}
+function isiHasilCari() {
+  const el = $('#hasilCari'); if (!el) return;
+  const q = rapiSpasi(S.cariSemua || '').toLowerCase();
+  if (q.length < 2) { el.innerHTML = '<div class="kosong">Ketik minimal 2 huruf nama, atau 4 angka terakhir NIK.</div>'; return; }
+  const cocok = (...teks) => teks.some(t => String(t || '').toLowerCase().indexOf(q) >= 0);
+  const aktif = x => x.status === 'Aktif' || x.status === 'Menunggu' || x.status === 'Hamil' || x.status === 'Nifas';
+  const hasil = [];
+  S.d.balita.filter(b => aktif(b) && posTerpilih(b) && cocok(b.nama, b.ibu, b.nik, 'rt ' + b.rt)).forEach(b => hasil.push({ nama: b.nama, kel: ['Balita', 'w-biru', 'bayi'], ke: 'balita/' + b.id,
+    sub: usiaTeks(usiaBulan(b.tglLahir, hariIni())) + ' · ibu ' + (b.ibu || '–') + ' · ' + rtRw(b) }));
+  S.d.ibu.filter(x => aktif(x) && posTerpilih(x) && cocok(x.nama, x.suami, x.nik, 'rt ' + x.rt)).forEach(x => hasil.push({ nama: x.nama, kel: [x.status === 'Nifas' ? 'Nifas' : 'Ibu hamil', 'w-pink', 'ibu'],
+    ke: 'bumil-profil/' + x.id, sub: (x.status === 'Nifas' ? 'nifas' : 'hamil') + ' · ' + rtRw(x) }));
+  S.d.lansia.filter(l => aktif(l) && posTerpilih(l) && cocok(l.nama, l.nik, 'rt ' + l.rt)).forEach(l => { const k = kelL(l);
+    hasil.push({ nama: l.nama, kel: k === 'dewasa' ? ['Usia dewasa', 'w-ungu', 'orang'] : ['Lansia', 'w-hijau', 'lansia'], ke: 'lansia-profil/' + l.id, sub: usiaTh(l.tglLahir) + ' th · ' + rtRw(l) }); });
+  hasil.sort((a, c) => a.nama.localeCompare(c.nama, 'id'));
+  const daftar = l => [['tambah-balita', 'Balita'], ['tambah-bumil', 'Ibu hamil'], ['tambah-dewasa', 'Usia dewasa'], ['tambah-lansia', 'Lansia']]
+    .map(x => `<button class="tombol garis kecil" data-aksi="ke" data-ke="${x[0]}">${ikon('tambah', 16)} ${x[1]}</button>`).join('');
+  el.innerHTML = (hasil.length ? `<p class="redup kecil" style="margin:0 4px 8px">${hasil.length > 50 ? '50 dari ' + hasil.length : hasil.length} ditemukan</p><div class="daftar">${hasil.slice(0, 50).map(h => `
+    <button class="item" data-aksi="ke" data-ke="${esc(h.ke)}"><span class="ik-grup ${h.kel[1]}">${ikon(h.kel[2], 18)}</span>
+      <span class="isi"><div class="nama">${esc(h.nama)}</div><div class="sub">${esc(h.kel[0])} · ${esc(h.sub)}</div></span>${ikon('kanan', 18)}</button>`).join('')}</div>`
+    : '<div class="kosong">Belum terdaftar di posyandu ini.</div>') +
+    `<div class="kartu" style="margin-top:12px"><b>Warga baru?</b><div class="redup kecil" style="margin:4px 0 10px">Daftarkan sesuai kelompoknya:</div><div class="deret-tombol">${daftar()}</div></div>`;
 }
 
 /* ---------- Ukur ---------- */
@@ -1649,14 +1693,17 @@ function viewFormLansia(id, kelBaru) {
       ${admin() ? `<label class="isian"><span>Posyandu *</span><select name="posyandu" required>${S.d.posyandu.map(p => `<option ${(l ? l.posyandu : S.pos) === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>` : ''}
       <label class="isian"><span>No HP</span><input name="hp" type="tel" inputmode="tel" maxlength="16" placeholder="Contoh: 081234567890" value="${v('hp')}"></label>
       <div class="grid2">
+        <label class="isian"><span>Riwayat hipertensi</span>${yt('rHT', l ? l.rHT : '')}</label>
+        <label class="isian"><span>Riwayat diabetes</span>${yt('rDM', l ? l.rDM : '')}</label>
+      </div>
+      <details class="lipat"><summary>Data tambahan untuk Kartu Bantu <span class="redup kecil">(boleh dilengkapi nanti)</span></summary>
+      <div class="grid2">
         <label class="isian"><span>Status perkawinan</span><select name="kawin"><option value="">Tidak tahu</option>${['Menikah', 'Tidak menikah'].map(k => `<option ${l && l.kawin === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>
         <label class="isian"><span>Pekerjaan</span><input name="kerja" maxlength="40" value="${v('kerja')}" autocapitalize="characters"></label>
       </div>
       <label class="isian"><span>No HP keluarga</span><input name="hpKel" type="tel" inputmode="tel" maxlength="16" placeholder="Contoh: 081234567890" value="${v('hpKel')}"></label>
       <div class="judul-bagian">Riwayat penyakit diri sendiri</div>
       <div class="grid2">
-        <label class="isian"><span>Hipertensi</span>${yt('rHT', l ? l.rHT : '')}</label>
-        <label class="isian"><span>Diabetes (DM)</span>${yt('rDM', l ? l.rDM : '')}</label>
         <label class="isian"><span>Stroke</span>${yt('rStroke', l ? l.rStroke : '')}</label>
         <label class="isian"><span>Jantung</span>${yt('rJantung', l ? l.rJantung : '')}</label>
         <label class="isian"><span>Asma</span>${yt('rAsma', l ? l.rAsma : '')}</label>
@@ -1677,6 +1724,7 @@ function viewFormLansia(id, kelBaru) {
       </div>
       <p class="redup kecil">Merokok dicatat di pemeriksaan bulanan.</p>
       <label class="isian"><span>Catatan</span><input name="catatan" maxlength="200" value="${v('catatan')}"></label>
+      </details>
       <div id="galatLs"></div>
       <button class="tombol penuh" type="submit">Simpan</button>
     </form>` };
@@ -2470,14 +2518,14 @@ function viewMenu() {
     <div class="judul-sub">Ibu hamil & nifas</div>
     <div class="daftar">
       ${item('bumil', 'Kunjungan ibu hamil', 'Daftar & kunjungan bulanan', '', 'ibu', 'pink')}
-      ${item('nifas', 'Nifas & menyusui', 'Kunjungan nifas, KB pasca salin, ASI eksklusif', '', 'bayi', 'pink')}
+      ${item('nifas', 'Nifas & menyusui', 'Kunjungan nifas, KB pasca salin, ASI eksklusif', '', 'ibuBayi', 'pink')}
       ${item('tambah-bumil', 'Tambah ibu hamil', 'Ibu hamil baru terdata', '', 'tambah', 'pink')}
       ${item('materi-bumil', 'Edukasi ibu hamil', 'Tanda bahaya, TTD, gizi, P4K', '', 'buku', 'pink')}
     </div>
     <div class="judul-sub">Usia dewasa 18–59 tahun</div>
     <div class="daftar">
-      ${item('dewasa', 'Pemeriksaan usia dewasa', 'Warga 18–59 tahun yang hadir ke posyandu', '', 'nadi', 'tosca')}
-      ${item('tambah-dewasa', 'Tambah warga usia dewasa', 'Daftarkan saat warga hadir', '', 'tambah', 'tosca')}
+      ${item('dewasa', 'Pemeriksaan usia dewasa', 'Warga 18–59 tahun yang hadir ke posyandu', '', 'orang', 'ungu')}
+      ${item('tambah-dewasa', 'Tambah warga usia dewasa', 'Daftarkan saat warga hadir', '', 'tambah', 'ungu')}
     </div>
     <div class="judul-sub">Lansia</div>
     <div class="daftar">
@@ -2877,7 +2925,7 @@ function viewAkun() {
 const VIEWS = {
   beranda: viewBeranda, ukur: viewUkur, imunisasi: viewImunisasi, risiko: viewRisiko, menu: viewMenu, balita: viewBalita, antrean: viewAntrean,
   'data-balita': viewDataBalita, 'tambah-balita': () => viewFormBalita(''), 'ubah-balita': viewFormBalita, dashboard: viewDashboard, pantau: viewPantau, belum: viewBelum,
-  lansia: () => viewLansia('lansia'), dewasa: () => viewLansia('dewasa'), 'tambah-dewasa': () => viewFormLansia('', 'dewasa'), 'lansia-profil': viewProfilLansia, 'materi-lansia': viewMateriLansia, 'materi-mpasi': viewMateriMPASI,
+  cari: viewCari, lansia: () => viewLansia('lansia'), dewasa: () => viewLansia('dewasa'), 'tambah-dewasa': () => viewFormLansia('', 'dewasa'), 'lansia-profil': viewProfilLansia, 'materi-lansia': viewMateriLansia, 'materi-mpasi': viewMateriMPASI,
   bumil: viewBumil, 'bumil-profil': viewProfilIbu, 'tambah-bumil': () => viewFormIbu(''), 'ubah-bumil': viewFormIbu, 'materi-bumil': viewMateriBumil, nifas: viewNifas, 'tambah-lansia': () => viewFormLansia(''), 'ubah-lansia': viewFormLansia,
   persetujuan: viewPersetujuan, laporan: viewLaporan, pengguna: viewPengguna, kunci: viewKunci, akun: viewAkun
 };

@@ -260,7 +260,7 @@ nav.bawah button.tengah.aktif { color: var(--utama); }
 .login-atas::after { content: ""; position: absolute; right: -70px; top: -50px; width: 230px; height: 230px; border-radius: 50%; background: rgba(255,255,255,.09); }
 .login-atas h1 { margin: 0 0 4px; font-size: 1.6rem; font-weight: 800; }
 .login-atas p { margin: 0; opacity: .9; }
-.logo-besar { width: 76px; height: 76px; border-radius: 22px; margin-bottom: 16px; box-shadow: 0 8px 20px rgba(0,0,0,.18); }
+.logo-besar { display: block; width: 76px; height: 76px; border-radius: 22px; margin-bottom: 16px; box-shadow: 0 8px 20px rgba(0,0,0,.18); }
 .login-kartu { background: #fff; border-radius: 24px; margin: -44px 16px 0; padding: 22px 18px; box-shadow: var(--bayang-kuat); position: relative; }
 .login-bawah { padding: 18px 16px 30px; }
 .halaman-muat { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 24px 20px; max-width: 420px; margin: 0 auto; }
@@ -409,7 +409,31 @@ form .chip.aktif { border-color: var(--utama); }
 .layanan-hasil .judul-kecil { font-size: .875rem; font-weight: 700; margin-bottom: 8px; color: var(--teks); }
 .layanan-hasil .deret-tombol { flex-wrap: wrap; }
 .layanan-hasil .tombol { flex: 1 1 auto; }
-/* usia dewasa 18–59 tahun: warna tosca */
-.hero-kartu.dewasa { border-top: 4px solid #1fb5a3; }
-.hero-kartu.dewasa .persen { background: var(--tosca-bg); color: var(--tosca); }
-.hero-kartu.dewasa .progres i { background: linear-gradient(90deg, #3ad6c3, #0f8f80); }
+/* usia dewasa 18–59 tahun: warna ungu (beda jelas dari lansia hijau) */
+.hero-kartu.dewasa { border-top: 4px solid #9a6bff; }
+.hero-kartu.dewasa .persen { background: var(--ungu-bg); color: var(--ungu); }
+.hero-kartu.dewasa .progres i { background: linear-gradient(90deg, #9a6bff, #6c3fd8); }
+
+/* kelompok layanan di halaman masuk */
+.layanan-login { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 18px 16px 0; }
+.layanan-login span { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; color: var(--teks-2); text-align: center; }
+.layanan-login .bulat { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; color: #fff; }
+
+/* beranda: kelompok tanpa sasaran cukup satu baris */
+.kartu-tipis { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 18px; padding: 10px 12px; margin-bottom: 10px; box-shadow: var(--bayang); }
+.kartu-tipis .isi { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.kartu-tipis .tombol { flex: none; min-height: 48px; }
+.cari-semua { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 0 16px; margin: 4px 0 14px; border: 0; border-radius: 16px; background: #fff; box-shadow: var(--bayang); color: var(--teks-2); font: inherit; text-align: left; cursor: pointer; }
+.cari-semua svg { color: var(--utama); flex: none; }
+.daftar .item .ik-grup { flex: none; }
+
+/* layar kosong: ilustrasi kecil (SVG di dalam CSS, tetap tampil tanpa internet) */
+.kosong:not([style])::before { content: ''; display: block; width: 96px; height: 72px; margin: 0 auto 12px; background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 72'%3E%3Cellipse cx='48' cy='64' rx='34' ry='5' fill='%23e8eef8'/%3E%3Crect x='22' y='14' width='52' height='46' rx='8' fill='%23fff' stroke='%23b9c8e6' stroke-width='2.5'/%3E%3Cpath d='M32 28h32M32 37h24M32 46h16' stroke='%23d5dff0' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='68' cy='22' r='12' fill='%23eaf2ff' stroke='%231468e5' stroke-width='3'/%3E%3Cpath d='M76.5 30.5 84 38' stroke='%231468e5' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E"); }
+
+/* formulir: isian tambahan dilipat */
+details.lipat { background: #fff; border-radius: 16px; border: 1.5px dashed var(--garis, #d5dff0); padding: 0 14px; margin: 6px 0 14px; }
+details.lipat > summary { min-height: 52px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 700; color: var(--utama); cursor: pointer; list-style: none; }
+details.lipat > summary::-webkit-details-marker { display: none; }
+details.lipat > summary::before { content: '+'; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--biru-bg); flex: none; }
+details.lipat[open] > summary::before { content: '–'; }
+details.lipat[open] { padding-bottom: 6px; }
