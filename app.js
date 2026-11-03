@@ -2131,6 +2131,11 @@ function viewProfilIbu(id) {
       ${x.status === 'Hamil' || x.status === 'Nifas' ? tombolPindah('ibu', id) : ''}
       ${hamil && !x.usulKeluar ? `<button class="tautan-bahaya" data-aksi="keluarIbu" data-id="${esc(id)}">Keluarkan (keguguran/pindah/meninggal)</button>` : ''}
     </div>
+    ${(() => { const kr = [['nik', 'NIK'], ['suami', 'Nama suami'], ['hp', 'No HP'], ['rw', 'RW'], ['tglLahir', 'Tanggal lahir'], ['hpht', 'HPHT'], ['bbPra', 'BB sebelum hamil'], ['tb', 'Tinggi badan']]
+      .filter(k => !String(x[k[0]] || '').trim() || (/^(bbPra|tb|rw)$/.test(k[0]) && !(+x[k[0]] > 0)));
+      return kr.length && (hamil || x.status === 'Nifas') ? `<div class="pesan-awas"><b>Kartu Bantu belum lengkap: ${kr.length} isian kosong</b>
+      <div class="kecil" style="margin:4px 0 8px">${kr.map(k => k[1]).join(', ')}</div>
+      <button class="tombol kecil" data-aksi="ke" data-ke="ubah-bumil/${esc(id)}">Lengkapi data</button></div>` : ''; })()}
     ${x.tglPersalinan ? `<div class="kartu"><h2>Persalinan</h2><div class="tabel-wrap"><table>
       ${ket('Tanggal', fmtTgl(x.tglPersalinan))}${ket('Tempat / penolong', esc(x.tempatPersalinan + ' / ' + x.penolong))}${ket('Cara', esc(x.caraPersalinan))}
       ${ket('Kondisi ibu', esc(x.kondisiIbu || '–'))}${ket('Bayi', bayi ? `<a href="#/balita/${esc(bayi.id)}">${esc(bayi.nama)}</a>` : x.idBayi ? esc(x.idBayi) : '–')}
