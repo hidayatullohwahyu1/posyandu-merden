@@ -1148,6 +1148,11 @@ function viewBalita(id) {
       ${aktif ? tombolPindah('balita', id) : ''}
       ${aktif && !usulan.length ? `<button class="tautan-bahaya" data-aksi="mutasi" data-id="${esc(id)}">Keluarkan dari daftar (pindah/meninggal)</button>` : ''}
     </div>
+    ${(() => { const kr = [['nik', 'NIK'], ['ayah', 'Nama ayah'], ['ibu', 'Nama ibu'], ['hp', 'No HP orang tua'], ['bbLahir', 'Berat lahir'], ['pbLahir', 'Panjang lahir']]
+      .filter(k => !String(b[k[0]] || '').trim() || (/Lahir$/.test(k[0]) && !(+b[k[0]] > 0)));
+      return kr.length && aktif ? `<div class="pesan-awas"><b>Kartu Bantu belum lengkap: ${kr.length} isian kosong</b>
+      <div class="kecil" style="margin:4px 0 8px">${kr.map(k => k[1]).join(', ')}</div>
+      <button class="tombol kecil" data-aksi="ke" data-ke="ubah-balita/${esc(id)}">Lengkapi data</button></div>` : ''; })()}
     ${t ? `<div class="kartu"><div class="baris antara"><h2 style="margin:0">Terakhir: ${namaPeriode(t.periode)}</h2><span class="lbl ${t.label}">${t.label}</span></div>
       <div class="grid2" style="margin-top:10px">
         <div class="angka"><b>${angka(t.bb)}</b><span>BB (kg) · ${esc(t.stBBU || '–')}</span></div>
