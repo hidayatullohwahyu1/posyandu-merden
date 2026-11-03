@@ -409,13 +409,17 @@ form .chip.aktif { border-color: var(--utama); }
 .layanan-hasil .judul-kecil { font-size: .875rem; font-weight: 700; margin-bottom: 8px; color: var(--teks); }
 .layanan-hasil .deret-tombol { flex-wrap: wrap; }
 .layanan-hasil .tombol { flex: 1 1 auto; }
+/* usia sekolah & remaja 5–17 tahun: warna oranye */
+.hero-kartu.remaja { border-top: 4px solid #ffa24a; }
+.hero-kartu.remaja .persen { background: var(--oranye-bg); color: var(--oranye); }
+.hero-kartu.remaja .progres i { background: linear-gradient(90deg, #ffa24a, #e46a11); }
 /* usia dewasa 18–59 tahun: warna ungu (beda jelas dari lansia hijau) */
 .hero-kartu.dewasa { border-top: 4px solid #9a6bff; }
 .hero-kartu.dewasa .persen { background: var(--ungu-bg); color: var(--ungu); }
 .hero-kartu.dewasa .progres i { background: linear-gradient(90deg, #9a6bff, #6c3fd8); }
 
 /* kelompok layanan di halaman masuk */
-.layanan-login { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 18px 16px 0; }
+.layanan-login { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 18px 12px 0; }
 .layanan-login span { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; color: var(--teks-2); text-align: center; }
 .layanan-login .bulat { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; color: #fff; }
 
@@ -437,3 +441,7 @@ details.lipat > summary::-webkit-details-marker { display: none; }
 details.lipat > summary::before { content: '+'; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--biru-bg); flex: none; }
 details.lipat[open] > summary::before { content: '–'; }
 details.lipat[open] { padding-bottom: 6px; }
+/* lima tab risiko (balita, ibu, remaja, dewasa, lansia): lebar menyesuaikan isi agar muat di layar 360 px */
+.tab-grup { gap: 2px; padding: 3px; }
+.tab-grup button { flex: 1 1 auto; padding: 0 5px; font-size: .86rem; white-space: nowrap; }
+.tab-grup .jml { min-width: 19px; height: 19px; padding: 0 5px; font-size: .7rem; }

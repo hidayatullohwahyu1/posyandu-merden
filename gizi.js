@@ -386,6 +386,7 @@ function hitungSkrining(d) {
   if (!kosong_(d.skorPUMA) && +d.skorPUMA >= BATAS_PUMA) temuan.push('PUMA: skor ' + d.skorPUMA + ', curiga PPOK');
   var indra = TES_INDRA.filter(function (t) { return d[t.kode] === 'Gangguan'; }).map(function (t) { return t.nama.toLowerCase(); });
   if (indra.length) temuan.push('Tes hitung jari/berbisik: gangguan ' + indra.join(', '));
+  if (d.stHb && d.stHb !== 'Normal') temuan.push(d.stHb + ' (Hb ' + String(d.hb).replace('.', ',') + ' g/dL)');
   return { katAKS: kA, katGDS: kG, katAMT: kM, temuan: temuan, perluRujuk: temuan.length > 0 };
 }
 /* Gabungan skrining terkini satu lansia. Catatan skrining bisa berisi sebagian saja (mis. hanya tes mata/telinga 6 bulanan),
@@ -403,6 +404,8 @@ function gabungSkrining(daftar) {
   TES_INDRA.forEach(function (t) { g[t.kode] = ind ? (ind[t.kode] || '') : ''; });
   var cv = ambil(function (s) { return s.covid === 'Y' || s.covid === 'T'; });
   g.covid = cv ? cv.covid : '';
+  var hb = ambil(function (s) { return +s.hb > 0; });
+  g.hb = hb ? +hb.hb : ''; g.stHb = hb ? (hb.stHb || '') : ''; g.tglHb = hb ? String(hb.tgl) : '';
   var h = hitungSkrining(g);
   g.katAKS = h.katAKS; g.katGDS = h.katGDS; g.katAMT = h.katAMT; g.temuan = h.temuan; g.perluRujuk = h.perluRujuk;
   return g;
@@ -410,7 +413,8 @@ function gabungSkrining(daftar) {
 function validasiSkrining(d) {
   if (!d.tgl || isNaN(tglKeMs(d.tgl))) return 'Tanggal skrining wajib diisi.';
   var ada = RANAH_SKILAS.some(function (r) { return d[r.kode] === 'Y' || d[r.kode] === 'T'; }) ||
-    ISIAN_SKRINING_RINCI.some(function (k) { return k !== 'penyuluhan' && k !== 'skorPUMA' && !kosong_(d[k]); });
+    ISIAN_SKRINING_RINCI.some(function (k) { return k !== 'penyuluhan' && k !== 'skorPUMA' && !kosong_(d[k]); }) || +d.hb > 0;
+  if (!kosong_(d.hb) && !(+d.hb >= 3 && +d.hb <= 20)) return 'Kadar Hb harus 3 sampai 20 g/dL.';
   var cek = function (v, maks) { return v === '' || v === null || v === undefined || (+v >= 0 && +v <= maks && Math.floor(+v) === +v); };
   if (!ada && kosong_(d.aks) && kosong_(d.gds) && kosong_(d.amt)) return 'Isi minimal satu hasil skrining.';
   for (var i = 0; i < BUTIR_AKS.length; i++) if (!cek(d[BUTIR_AKS[i].kode], BUTIR_AKS[i].pilihan.length - 1)) return 'Skor AKS "' + BUTIR_AKS[i].nama + '" tidak valid.';
@@ -420,6 +424,69 @@ function validasiSkrining(d) {
   if (!cek(d.amt, 10)) return 'Skor AMT harus 0 sampai 10.';
   return '';
 }
+/* ---------- Usia sekolah & remaja (5 tahun s.d. sebelum 18 tahun) ----------
+   IMT/U (Permenkes 2/2020, referensi WHO 2007): gizi buruk < -3 SD; gizi kurang -3 s.d. < -2 SD; gizi baik -2 s.d. +1 SD;
+   gizi lebih > +1 s.d. +2 SD; obesitas > +2 SD. Lingkar perut dan tekanan darah dinilai mulai 15 tahun (sesuai Kartu Bantu):
+   TD normal < 130/85, tinggi >= 130/85, sangat tinggi >= 160/100. TBC (Kartu Bantu): rujuk bila 2 gejala atau lebih.
+   Anemia (WHO): Hb < 11,5 g/dL usia 5–11 th; < 12 g/dL usia 12 th ke atas; < 8 g/dL anemia berat. */
+var PENYULUHAN_REMAJA = ['Gizi seimbang & sarapan', 'Anemia & TTD', 'Aktivitas fisik', 'Kesehatan reproduksi', 'Bahaya rokok & NAPZA',
+  'Kebersihan diri (PHBS)', 'Kesehatan jiwa & perundungan', 'Cegah TBC'];
+var USIA_TD_REMAJA = 15;
+function zIMTU(jk, tglLahir, tgl, imt) {
+  var bln = usiaHari(tglLahir, tgl) / 30.4375;
+  if (!(imt > 0) || !(bln >= 60) || bln > 229) return null;
+  return _z(imt, _lms(WHO[jk === 'P' ? 'P' : 'L'].imtu, bln - 60), true);
+}
+function statusIMTU(z) {
+  if (z === null || z === undefined || z === '') return '';
+  return z < -3 ? 'Gizi buruk' : z < -2 ? 'Gizi kurang' : z <= 1 ? 'Gizi baik' : z <= 2 ? 'Gizi lebih' : 'Obesitas';
+}
+function statusTDRemaja(sistol, diastol) {
+  var s = +sistol, d = +diastol;
+  if (!(s > 0) || !(d > 0)) return '';
+  return s >= 160 || d >= 100 ? 'Sangat tinggi' : s >= 130 || d >= 85 ? 'Tinggi' : 'Normal';
+}
+function statusHb(hb, usia) {
+  var v = +hb; if (!(v > 0)) return '';
+  return v < 8 ? 'Anemia berat' : v < (usia >= 12 ? 12 : 11.5) ? 'Anemia' : 'Normal';
+}
+/* p = {jk, tglLahir, tgl, bb, tb, lp, sistol, diastol, tbcBatuk, tbcDemam, tbcBB, tbcKontak} */
+function hitungRemaja(p) {
+  var bb = +p.bb || 0, tb = +p.tb || 0, usia = Math.floor(usiaBulan(p.tglLahir, p.tgl) / 12), besar = usia >= USIA_TD_REMAJA;
+  var lp = besar ? +p.lp || 0 : 0, s = besar ? +p.sistol || 0 : 0, d = besar ? +p.diastol || 0 : 0;
+  var imt = bb > 0 && tb > 0 ? Math.round(bb / Math.pow(tb / 100, 2) * 10) / 10 : null;
+  var z = imt ? zIMTU(p.jk, p.tglLahir, p.tgl, imt) : null, stIMT = statusIMTU(z), stTD = statusTDRemaja(s, d);
+  var stLP = lp > 0 ? (lp > (p.jk === 'L' ? 90 : 80) ? 'Obesitas sentral' : 'Normal') : '';
+  var merah = [], kuning = [], td = s + '/' + d, zt = z === null ? '' : String(z).replace('.', ',');
+  if (stIMT === 'Gizi buruk') merah.push('IMT/U gizi buruk (z ' + zt + ') — rujuk');
+  else if (stIMT === 'Gizi kurang' || stIMT === 'Gizi lebih' || stIMT === 'Obesitas') kuning.push('IMT/U ' + stIMT.toLowerCase() + ' (z ' + zt + ')');
+  if (stTD === 'Sangat tinggi') merah.push('Tekanan darah sangat tinggi ' + td + ' — rujuk');
+  else if (stTD === 'Tinggi') kuning.push('Tekanan darah tinggi (' + td + ')');
+  if (stLP === 'Obesitas sentral') kuning.push('Lingkar perut berlebih (' + String(lp).replace('.', ',') + ' cm)');
+  var gejala = [p.tbcBatuk, p.tbcDemam, p.tbcBB].filter(function (v) { return v === 'Y'; }).length;
+  if (gejala >= 2) merah.push(gejala + ' gejala TBC — rujuk ke puskesmas untuk pemeriksaan TBC');
+  else if (gejala === 1 || p.tbcKontak === 'Y') kuning.push(p.tbcKontak === 'Y' ? 'Kontak erat pasien TBC — pantau gejala, periksa ke puskesmas' : '1 gejala TBC — pantau, rujuk bila bertambah');
+  return { imt: imt, zIMTU: z, stIMT: stIMT, stLP: stLP, stTD: stTD, stGD: '', stKol: '', stAU: '',
+    label: merah.length ? 'Merah' : kuning.length ? 'Kuning' : 'Hijau', alasan: merah.concat(kuning) };
+}
+function validasiRemaja(d) {
+  if (!d.tgl || isNaN(tglKeMs(d.tgl))) return 'Tanggal pemeriksaan wajib diisi.';
+  if (periodeDari(d.tgl) !== d.periode) return 'Tanggal pemeriksaan harus di dalam periode ' + namaPeriode(d.periode) + '.';
+  if (!(+d.bb > 0) && !(+d.tb > 0) && !(+d.lp > 0) && !(+d.sistol > 0)) return 'Isi minimal satu hasil pemeriksaan.';
+  if (+d.bb && (+d.bb < 8 || +d.bb > 150)) return 'Berat badan harus 8 sampai 150 kg.';
+  if (+d.tb && (+d.tb < 80 || +d.tb > 200)) return 'Tinggi badan harus 80 sampai 200 cm.';
+  if (+d.lp && (+d.lp < 40 || +d.lp > 150)) return 'Lingkar perut harus 40 sampai 150 cm.';
+  if (+d.bb && +d.tb) {
+    var imt = +d.bb / Math.pow(+d.tb / 100, 2);
+    if (imt < 9 || imt > 50) return 'Berat dan tinggi badan tidak cocok (IMT ' + String(Math.round(imt * 10) / 10).replace('.', ',') + '). Periksa kembali angka dan satuannya (kg, cm).';
+  }
+  if ((+d.sistol > 0) !== (+d.diastol > 0)) return 'Isi tekanan darah lengkap: sistol dan diastol.';
+  if (+d.sistol && (+d.sistol < 60 || +d.sistol > 220)) return 'Sistol harus 60 sampai 220 mmHg.';
+  if (+d.diastol && (+d.diastol < 30 || +d.diastol > 140)) return 'Diastol harus 30 sampai 140 mmHg.';
+  if (+d.sistol && +d.sistol <= +d.diastol) return 'Sistol (angka atas) harus lebih besar dari diastol (angka bawah).';
+  return '';
+}
+
 /* Topik edukasi gizi balita yang dicatat saat penimbangan (fokus MP-ASI kaya protein hewani). */
 var EDUKASI_BALITA = ['ASI eksklusif', 'MP-ASI protein hewani', 'Tekstur & porsi MP-ASI', 'Pemberian makan responsif', 'Kebersihan makanan'];
 /* Obat cacing: anak 12–59 bulan, dua kali setahun (semester Februari dan Agustus, bersama bulan vitamin A). */
