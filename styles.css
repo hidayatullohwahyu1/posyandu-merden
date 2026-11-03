@@ -409,3 +409,7 @@ form .chip.aktif { border-color: var(--utama); }
 .layanan-hasil .judul-kecil { font-size: .875rem; font-weight: 700; margin-bottom: 8px; color: var(--teks); }
 .layanan-hasil .deret-tombol { flex-wrap: wrap; }
 .layanan-hasil .tombol { flex: 1 1 auto; }
+/* usia dewasa 18–59 tahun: warna tosca */
+.hero-kartu.dewasa { border-top: 4px solid #1fb5a3; }
+.hero-kartu.dewasa .persen { background: var(--tosca-bg); color: var(--tosca); }
+.hero-kartu.dewasa .progres i { background: linear-gradient(90deg, #3ad6c3, #0f8f80); }
