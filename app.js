@@ -1547,7 +1547,7 @@ async function simpanPeriksaL(f) {
   if (lalu && lalu.periode < periode && +lalu.bb && x.bb && Math.abs(x.bb - lalu.bb) > 5) w.push('Berat badan berubah lebih dari 5 kg dari pemeriksaan terakhir (' + angka(lalu.bb) + ' kg).');
   if (lalu && lalu.periode < periode && +lalu.tb && x.tb && Math.abs(x.tb - lalu.tb) > 3) w.push('Tinggi badan berbeda lebih dari 3 cm dari pemeriksaan terakhir (' + angka(lalu.tb) + ' cm).');
   if (w.length && !await konfirmasi('Periksa kembali angkanya', w.map(esc).join('<br>') + '<br><br>Apakah angka sudah benar?', 'Ya, tetap simpan')) return;
-  await antrekan('simpanPeriksaLansia', x, 'Periksa lansia ' + l.nama + ' (' + namaPeriode(periode) + ')');
+  await antrekan('simpanPeriksaLansia', x, 'Periksa ' + ORANG_KEL[kelL(l)] + ' ' + l.nama + ' (' + namaPeriode(periode) + ')');
   tampilHasilL(l, periksaDi(id, periode));
 }
 
@@ -1576,7 +1576,7 @@ function tampilHasilL(l, u) {
 
 function viewProfilLansia(id) {
   const l = S.d.lansiaById[id];
-  if (!l) return { judul: 'Lansia', nav: 'menu', html: '<div class="kosong">Data lansia tidak ditemukan.</div>' };
+  if (!l) return { judul: 'Lansia / Usia Dewasa', nav: 'menu', html: '<div class="kosong">Data tidak ditemukan. Mungkin sudah dipindah atau belum tersinkron.</div>' };
   const rows = Object.values(S.d.periksaL[id] || {}).sort((a, c) => (a.periode < c.periode ? 1 : -1)), t = rows[0];
   const aktif = l.status === 'Aktif' || l.status === 'Menunggu', ket = (k, v) => `<tr><td class="redup">${k}</td><td>${v}</td></tr>`;
   const yt = v => v === 'Y' ? 'Ya' : v === 'T' ? 'Tidak' : '–';
@@ -1708,7 +1708,7 @@ async function simpanLansiaForm(f) {
 
 function formKeluarL(id) {
   const l = S.d.lansiaById[id];
-  bukaLembar(`<h3>Keluarkan dari daftar lansia</h3><div class="redup kecil" style="margin-bottom:12px">${esc(l.nama)}. ${admin() ? 'Langsung berlaku.' : 'Usulan akan disetujui admin.'} Data tidak dihapus.</div>
+  bukaLembar(`<h3>Keluarkan dari daftar ${ORANG_KEL[kelL(l)]}</h3><div class="redup kecil" style="margin-bottom:12px">${esc(l.nama)}. ${admin() ? 'Langsung berlaku.' : 'Usulan akan disetujui admin.'} Data tidak dihapus.</div>
     <form id="fKeluarL" data-id="${esc(id)}">
       <label class="isian"><span>Alasan</span><select name="alasan" required><option value="">Pilih…</option><option>Meninggal</option><option>Pindah</option><option>Lainnya</option><option>Data ganda/salah input</option></select></label>
       <label class="isian"><span>Tanggal</span><input type="date" name="tanggal" value="${hariIni()}" max="${hariIni()}" required></label>
@@ -2773,7 +2773,7 @@ function viewPersetujuan() {
         <div class="deret-tombol" style="flex:none"><button class="tombol kecil" data-aksi="setujuiB" data-id="${esc(b.id)}" data-s="1" ${b.tglLahir && b.jk && b.posyandu ? '' : 'disabled title="Lengkapi data dulu"'}>Setujui</button>
         <button class="tombol bahaya kecil" data-aksi="setujuiB" data-id="${esc(b.id)}" data-s="0">Tolak</button><button class="tombol garis kecil" data-aksi="ke" data-ke="ubah-balita/${esc(b.id)}">Ubah</button></div></div>`).join('')}</div>` : '<div class="kosong" style="padding:14px">Tidak ada.</div>'}
       ${(d.pindahPos || []).length ? `<div class="judul-bagian">Usulan pindah posyandu (${d.pindahPos.length})</div><div class="daftar">${d.pindahPos.map(m => `<div class="item rinci" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(m.nama)}</div>
-        <div class="sub">${esc({ balita: 'Balita', ibu: 'Ibu hamil/nifas', lansia: 'Lansia' }[m.kelompok] || m.kelompok)} · ${esc(m.dari)} → <b>${esc(m.ke)}</b> · ${esc(m.alasan)} · ${fmtTgl(m.tanggal)} · oleh ${esc(m.oleh)}</div></span>
+        <div class="sub">${esc({ balita: 'Balita', ibu: 'Ibu hamil/nifas', dewasa: 'Usia dewasa', lansia: 'Lansia' }[m.kelompok] || m.kelompok)} · ${esc(m.dari)} → <b>${esc(m.ke)}</b> · ${esc(m.alasan)} · ${fmtTgl(m.tanggal)} · oleh ${esc(m.oleh)}</div></span>
         <div class="deret-tombol" style="flex:none"><button class="tombol kecil" data-aksi="setujuiPdh" data-id="${esc(m.id)}" data-s="1">Setujui</button>
         <button class="tombol bahaya kecil" data-aksi="setujuiPdh" data-id="${esc(m.id)}" data-s="0">Tolak</button></div></div>`).join('')}</div>` : ''}
       ${(d.ibuKeluar || []).length ? `<div class="judul-bagian">Usulan keluar ibu hamil (${d.ibuKeluar.length})</div><div class="daftar">${d.ibuKeluar.map(m => `<div class="item rinci" style="cursor:default;flex-wrap:wrap"><span class="isi"><div class="nama">${esc(m.nama)}</div>
@@ -2971,7 +2971,7 @@ const AKSI = {
     el.disabled = true;
     const r = await api('prosesKeluarLansia', { id: el.dataset.id, setuju: el.dataset.s === '1' });
     if (!r.ok) { toast(r.pesan); el.disabled = false; return; }
-    toast(el.dataset.s === '1' ? 'Lansia dikeluarkan.' : 'Usulan ditolak.'); render(); sinkron(true);
+    toast(el.dataset.s === '1' ? 'Dikeluarkan dari daftar.' : 'Usulan ditolak.'); render(); sinkron(true);
   },
   formPD3I: el => formPD3I(el.dataset.id, el.dataset.lapor),
   mutasi: el => formMutasi(el.dataset.id),
@@ -3173,7 +3173,7 @@ const KIRIM = {
     const err = validasiSkrining(x) || (x.tgl > hariIni() || x.tgl < l.tglLahir ? 'Tanggal skrining tidak valid.' : '')
       || (!admin() && x.tgl.slice(0, 7) < geserPeriode(periodeKini(), -1) ? 'Kader hanya bisa mencatat bulan ini dan bulan lalu. Hubungi admin.' : '');
     if (err) { $('#galatSkL').innerHTML = `<div class="pesan-galat">${esc(err)}</div>`; return; }
-    await antrekan('simpanSkriningLansia', x, 'Skrining lansia ' + l.nama);
+    await antrekan('simpanSkriningLansia', x, 'Skrining ' + ORANG_KEL[kelL(l)] + ' ' + l.nama);
     const h = hitungSkrining(lengkapiSkrining(Object.assign({}, x), l.jk, Math.floor(usiaBulan(l.tglLahir, x.tgl) / 12)));
     if (!kembaliKeHasil(f.dataset.id)) { tutupLembar(); render(); } toast(h.perluRujuk ? 'Skrining tersimpan: perlu pemeriksaan lanjut di Puskesmas.' : 'Skrining tersimpan: tidak ada temuan.', 5000);
   },
@@ -3182,8 +3182,8 @@ const KIRIM = {
     const l = S.d.lansiaById[f.dataset.id];
     if (!f.alasan.value) { toast('Pilih alasan.'); return; }
     if (!tglKeluarSah(f, Object.values(S.d.periksaL[l.id] || {}).map(u => u.tgl).concat(Object.values(S.d.skriningL[l.id] || {}).map(u => u.tgl)))) return;
-    await antrekan('usulKeluarLansia', { id: l.id, alasan: f.alasan.value, tanggal: f.tanggal.value, keterangan: rapiSpasi(f.keterangan.value) }, 'Keluar lansia: ' + l.nama);
-    tutupLembar(); toast(admin() ? 'Lansia dikeluarkan dari daftar.' : 'Usulan terkirim ke admin.'); render();
+    await antrekan('usulKeluarLansia', { id: l.id, alasan: f.alasan.value, tanggal: f.tanggal.value, keterangan: rapiSpasi(f.keterangan.value) }, 'Keluar ' + ORANG_KEL[kelL(l)] + ': ' + l.nama);
+    tutupLembar(); toast(admin() ? 'Dikeluarkan dari daftar ' + ORANG_KEL[kelL(l)] + '.' : 'Usulan terkirim ke admin.'); render();
   },
   fKPSP: async f => {
     const b = S.d.byId[f.dataset.id];
