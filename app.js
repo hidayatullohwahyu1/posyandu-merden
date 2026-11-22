@@ -3055,7 +3055,7 @@ function viewLaporan() {
     const r = await api('daftarLaporan', {}); const el = $('#isiOnline'); if (!el) return;
     if (!r.ok) return tampilGagal(r);
     el.innerHTML = r.data.length ? `<div class="daftar">${r.data.map(f => `<div class="item" style="cursor:default"><span class="isi"><div class="nama">${esc(f.nama)}</div><div class="sub">${esc(f.tanggal)}</div></span>
-      <a class="tombol garis kecil" href="${esc(f.unduh)}" target="_blank" rel="noopener">Unduh</a></div>`).join('')}</div>` : '<div class="kosong">Belum ada laporan.</div>';
+      <button type="button" class="tombol garis kecil" data-aksi="unduhLap" data-id="${esc(f.id || '')}" data-unduh="${esc(f.unduh)}">Unduh</button></div>`).join('')}</div>` : '<div class="kosong">Belum ada laporan.</div>';
   };
   return v;
 }
@@ -3292,8 +3292,24 @@ const AKSI = {
     el.disabled = false; el.textContent = 'Buat laporan';
     const file = r.ok ? (r.data.file || [{ kelompok: 'Balita', nama: r.data.nama, url: r.data.url, unduh: r.data.unduh }]) : [];
     h.innerHTML = r.ok ? file.map(f => `<div class="pesan-info" style="margin-top:12px"><b>${esc(f.kelompok)}</b> — ${esc(f.nama)} siap.</div><div class="deret-tombol">
-      <a class="tombol" href="${esc(f.unduh)}" target="_blank" rel="noopener">Unduh Excel</a><a class="tombol garis" href="${esc(f.url)}" target="_blank" rel="noopener">Buka di Drive</a></div>`).join('')
+      <button type="button" class="tombol" data-aksi="unduhLap" data-id="${esc(f.id || '')}" data-unduh="${esc(f.unduh)}">Unduh Excel</button><a class="tombol garis" href="${esc(f.url)}" target="_blank" rel="noopener">Buka di Drive</a></div>`).join('')
       : `<div class="pesan-galat" style="margin-top:12px">${esc(r.pesan)}</div>`;
+  },
+  // Unduh laporan lewat API (tanpa login Google di HP); bila server lama belum memberi id, pakai tautan Drive
+  unduhLap: async el => {
+    const id = el.dataset.id;
+    if (!id) { window.open(el.dataset.unduh, '_blank', 'noopener'); return; }
+    const teks = el.innerHTML; el.disabled = true; el.innerHTML = '<span class="spinner"></span> Mengunduh…';
+    const r = await api('unduhLaporan', { id }, { batas: 120000 });
+    el.disabled = false; el.innerHTML = teks;
+    if (!r.ok) { toast(r.pesan || 'Gagal mengunduh laporan.', 5000); return; }
+    const bin = atob(r.data.isi), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([u8], { type: r.data.tipe }));
+    a.download = r.data.nama; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    toast(r.data.nama + ' terunduh. Buka dari folder Download.', 4500);
   },
   unduhEppgbm: async el => {
     const p = $('#perEp').value, pos = $('#posEp').value, h = $('#hasilEp'), teks = el.innerHTML;
