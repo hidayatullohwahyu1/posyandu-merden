@@ -3040,7 +3040,7 @@ function viewLaporan() {
     <label class="isian"><span>Cakupan</span><select id="posLap"><option value="">Seluruh desa (semua posyandu + TOTAL DESA)</option>${S.d.posyandu.map(p => `<option value="${esc(p)}">Posyandu ${esc(p)} saja</option>`).join('')}</select></label>
     <button class="tombol penuh" data-aksi="buatLaporan">Buat laporan</button>
     <p class="redup kecil">Balita: rekap SKDN, gizi, imunisasi, vitamin A, obat cacing, MP-ASI, KPSP, PD3I. Ibu: ibu hamil, persalinan, nifas, KB, ASI. Lansia: pemeriksaan, skrining, rujukan.
-      Robot membuat ketiganya setiap tanggal 1 dan mengirim tautannya ke email admin. Pembuatan bisa memakan waktu 1–3 menit.</p>
+      Robot membuat laporan setiap tanggal 1 dan mengirim tautannya ke email admin. Pembuatan butuh ±1–3 menit per kelompok; kemajuannya tampil setelah tombol ditekan.</p>
     <div id="hasilLap"></div></div>
     <div class="kartu"><h2>File impor ePPGBM</h2>
     <p class="redup kecil" style="margin-top:0">Data pengukuran dalam format "Format Import Data Pengukuran Balita" ePPGBM. Hanya balita yang sudah ditimbang dan punya NIK 16 angka.</p>
@@ -3286,12 +3286,43 @@ const AKSI = {
       <button type="button" class="tombol garis penuh" style="margin-top:10px" data-aksi="tutup">Tutup</button>`);
   },
   buatLaporan: async el => {
-    const p = $('#perLap').value, h = $('#hasilLap');
-    el.disabled = true; el.innerHTML = '<span class="spinner"></span> Membuat laporan…';
-    const r = await api('buatLaporan', { periode: p, kelompok: $('#kelLap').value, posyandu: $('#posLap').value }, { batas: 300000 });
-    el.disabled = false; el.textContent = 'Buat laporan';
+    const p = $('#perLap').value, h = $('#hasilLap'), kel = $('#kelLap').value, pos = $('#posLap').value;
+    const pilihan = ['#perLap', '#kelLap', '#posLap'].map(s => $(s));
+    el.disabled = true; el.innerHTML = '<span class="spinner"></span> Membuat laporan…'; pilihan.forEach(x => { x.disabled = true; });
+    // bilah kemajuan: tahap dari server (progresLaporan tiap 4 detik) + waktu berjalan + perkiraan sisa
+    const kunciDurasi = 'durasiLap:' + (kel || 'semua') + (pos ? ':pos' : '');
+    let perkiraan = 0; try { perkiraan = +localStorage.getItem(kunciDurasi) || 0; } catch (e) { /* penyimpanan tidak tersedia */ }
+    if (!perkiraan) perkiraan = kel === 'balita' ? 150 : kel ? 70 : 360;   // detik, sebelum ada pengalaman
+    const idProses = 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), mulai = Date.now();
+    let srv = null;
+    h.innerHTML = `<div class="proses-lap" role="status" aria-live="polite">
+      <div class="proses-atas"><b id="plTeks">Menghubungi server…</b><span id="plPersen">0%</span></div>
+      <div class="progres"><i id="plBilah" style="width:2%"></i></div>
+      <div class="proses-waktu" id="plWaktu"></div>
+      <p class="redup kecil" style="margin:8px 0 0">Biarkan halaman ini terbuka. Bila sinyal terputus, laporan tetap dibuat di server dan muncul di "Laporan tersimpan" di bawah dalam beberapa menit.</p></div>`;
+    const menit = d => d < 60 ? Math.max(1, Math.round(d)) + ' detik' : Math.round(d / 60) + ' menit';
+    const jam = d => Math.floor(d / 60) + ':' + String(Math.floor(d % 60)).padStart(2, '0');
+    const gambar = () => {
+      const t = (Date.now() - mulai) / 1000, pSrv = srv ? srv.persen : 0;
+      const pWaktu = Math.min(95, t / perkiraan * 100);   // bilah tetap bergerak walau tahap server lama
+      const persen = Math.round(Math.max(pSrv, Math.min(pWaktu, pSrv + 25), 2));
+      let sisa = perkiraan - t;
+      if (pSrv >= 15) sisa = (t / pSrv * 100 - t) * 0.6 + sisa * 0.4;
+      const el1 = $('#plTeks'), el2 = $('#plPersen'), el3 = $('#plBilah'), el4 = $('#plWaktu'); if (!el1) return;
+      el1.textContent = srv ? (srv.dari > 1 ? `(${srv.ke}/${srv.dari}) ` : '') + srv.teks : 'Menyiapkan laporan…';
+      el2.textContent = persen + '%'; el3.style.width = persen + '%';
+      el4.textContent = 'Sudah berjalan ' + jam(t) + ' · ' + (sisa > 20 ? 'perkiraan sisa ±' + menit(sisa) : 'hampir selesai…');
+    };
+    gambar();
+    h.scrollIntoView({ block: 'center', behavior: 'smooth' });   // di HP panel ada di bawah tombol, di luar layar
+    const detak = setInterval(gambar, 1000);
+    const tanya = setInterval(async () => { const q = await api('progresLaporan', { id: idProses }, { batas: 10000 }); if (q.ok && q.data) { srv = q.data; gambar(); } }, 4000);
+    const r = await api('buatLaporan', { periode: p, kelompok: kel, posyandu: pos, idProses }, { batas: 360000 });
+    clearInterval(detak); clearInterval(tanya);
+    el.disabled = false; el.textContent = 'Buat laporan'; pilihan.forEach(x => { x.disabled = false; });
+    if (r.ok) try { localStorage.setItem(kunciDurasi, String(Math.round((Date.now() - mulai) / 1000))); } catch (e) { /* abaikan */ }
     const file = r.ok ? (r.data.file || [{ kelompok: 'Balita', nama: r.data.nama, url: r.data.url, unduh: r.data.unduh }]) : [];
-    h.innerHTML = r.ok ? file.map(f => `<div class="pesan-info" style="margin-top:12px"><b>${esc(f.kelompok)}</b> — ${esc(f.nama)} siap.</div><div class="deret-tombol">
+    h.innerHTML = r.ok ? file.map(f => `<div class="pesan-info" style="margin-top:12px"><b>${esc(f.kelompok)}</b> — ${esc(f.nama)} siap (${Math.round((Date.now() - mulai) / 1000)} detik).</div><div class="deret-tombol">
       <button type="button" class="tombol" data-aksi="unduhLap" data-id="${esc(f.id || '')}" data-unduh="${esc(f.unduh)}">Unduh Excel</button><a class="tombol garis" href="${esc(f.url)}" target="_blank" rel="noopener">Buka di Drive</a></div>`).join('')
       : `<div class="pesan-galat" style="margin-top:12px">${esc(r.pesan)}</div>`;
   },

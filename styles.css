@@ -70,6 +70,12 @@ button.angka { text-align: left; width: 100%; display: flex; flex-direction: col
 
 .progres { height: 10px; border-radius: 99px; background: var(--abu-bg); overflow: hidden; margin: 10px 0 6px; }
 .progres i { display: block; height: 100%; background: linear-gradient(90deg, #22a3f2, #1468e5); border-radius: 99px; }
+.proses-lap { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--biru-bg); }
+.proses-lap .progres { background: #fff; height: 12px; }
+.proses-lap .progres i { transition: width .8s ease; }
+.proses-atas { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.proses-atas b { font-size: .95rem; } .proses-atas span { font-weight: 700; color: var(--biru); font-variant-numeric: tabular-nums; }
+.proses-waktu { font-size: .88rem; font-variant-numeric: tabular-nums; }
 
 /* ---------- Beranda gaya e-wallet ---------- */
 .beranda-latar { position: absolute; left: 0; right: 0; top: 0; height: 250px; background: var(--gradasi); border-radius: 0 0 28px 28px; z-index: 0; overflow: hidden; }
