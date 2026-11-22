@@ -1230,6 +1230,7 @@ function viewBalita(id) {
         <span class="lbl ${b.status === 'Aktif' ? 'Hijau' : b.status === 'Menunggu' ? 'Kuning' : 'Abu'}">${esc(b.status)}</span></div>
       ${b.status === 'Menunggu' ? '<div class="pesan-info" style="margin-top:12px">Menunggu persetujuan admin. Pengukuran tetap bisa dicatat.</div>' : ''}
       ${usulan.length ? `<div class="pesan-awas" style="margin-top:12px">Diusulkan keluar (${esc(usulan[0].Alasan)}), menunggu persetujuan admin.</div>` : ''}
+      ${tautanKelompok('', b.lanjutan)}
       <div class="tabel-wrap"><table style="margin-top:8px">
         ${ket('Tanggal lahir', fmtTgl(b.tglLahir))}${ket('NIK', esc(b.nik || '–'))}${ket('No KK', esc(b.kk || '–'))}
         ${ket('Ayah / Ibu', esc((b.ayah || '–') + ' / ' + (b.ibu || '–')))}${ket('RT / RW', rtRw(b).slice(6))}
@@ -1752,6 +1753,16 @@ const ISIAN_KARTU_R = [['hp', 'No HP orang tua'], ['ayah', 'Nama ayah'], ['ibu',
   ['rHT', 'Riwayat hipertensi'], ['rDM', 'Riwayat diabetes'], ['rStroke', 'Riwayat stroke'], ['rJantung', 'Riwayat jantung'], ['rAsma', 'Riwayat asma'],
   ['rKanker', 'Riwayat kanker'], ['rKol', 'Riwayat kolesterol tinggi'], ['rkHT', 'Hipertensi keluarga'], ['rkDM', 'DM keluarga'], ['rkStroke', 'Stroke keluarga'],
   ['rkJantung', 'Jantung keluarga'], ['rkAsma', 'Asma keluarga'], ['rkKanker', 'Kanker keluarga'], ['rkKol', 'Kolesterol tinggi keluarga']];
+/* Tautan riwayat antar kelompok usia (pindah kelompok otomatis tiap tanggal 1: balita → remaja → dewasa → lansia) */
+function tautanKelompok(asal, lanjutan) {
+  const satu = (id, teks) => {
+    if (!id) return '';
+    const blt = /^BLT-/.test(id), ada = blt ? S.d.byId[id] : S.d.lansiaById[id];
+    return `<div class="pesan-info" style="margin-top:12px">${teks} <b>${blt ? 'balita' : esc(NAMA_KEL[kelL({ id })].toLowerCase())}</b> (${esc(id)}).
+      ${ada ? `<a href="#/${blt ? 'balita' : 'lansia-profil'}/${encodeURIComponent(id)}">Lihat data &amp; riwayatnya</a>` : 'Riwayat lama tetap tersimpan di server.'}</div>`;
+  };
+  return satu(asal, 'Lanjutan dari data') + satu(lanjutan, 'Sudah lewat batas usia, kini dipantau sebagai');
+}
 const kurangKartuL = l => (kelL(l) === 'remaja' ? ISIAN_KARTU_R : ISIAN_KARTU_L).filter(k => !String(l[k[0]] || '').trim());
 function viewProfilLansia(id) {
   const l = S.d.lansiaById[id];
@@ -1766,6 +1777,7 @@ function viewProfilLansia(id) {
         <div class="redup kecil meta"><span>${NAMA_KEL[kelL(l)]}</span> · <span>${l.jk === 'L' ? 'Laki-laki' : 'Perempuan'}</span> · <span>${usiaTh(l.tglLahir)} th</span> · <span>${esc(l.posyandu)}</span></div></div>
         <span class="lbl ${l.status === 'Aktif' ? 'Hijau' : l.status === 'Menunggu' ? 'Kuning' : 'Abu'}">${esc(l.status)}</span></div>
       ${l.usulKeluar ? `<div class="pesan-awas" style="margin-top:12px">Diusulkan keluar (${esc(l.usulKeluar)}), menunggu persetujuan admin.</div>` : ''}
+      ${tautanKelompok(l.asal, l.lanjutan)}
       <div class="deret-tombol" style="margin-top:12px">
         ${aktif ? `<button class="tombol" data-aksi="formPeriksaLP" data-id="${esc(id)}" data-p="${periodeKini()}">${ikon('ukur', 20)} Periksa</button>` : ''}
         <button class="tombol garis" data-aksi="ke" data-ke="ubah-lansia/${esc(id)}">Ubah data</button>
