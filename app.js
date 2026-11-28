@@ -677,6 +677,28 @@ async function keluar() {
   render();
 }
 
+/* ---------- Waktu proses & unduhan lewat API ---------- */
+const jamTeks = d => Math.floor(d / 60) + ':' + String(Math.floor(d % 60)).padStart(2, '0');
+const lamaTeks = d => d < 60 ? Math.max(1, Math.round(d)) + ' detik' : Math.round(d / 60) + ' menit';
+const ukuranTeks = b => b >= 1048576 ? angka(Math.round(b / 104857.6) / 10) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+/* Panggil f(detik berjalan) sekarang dan tiap detik; kembalikan fungsi penghenti */
+function jalanWaktu(f) { const m = Date.now(), g = () => f((Date.now() - m) / 1000); g(); const t = setInterval(g, 1000); return () => clearInterval(t); }
+/* Berkas Drive desa (laporan, kartu) diambil server sebagai base64: akun kader tidak perlu akses Google Drive */
+async function unduhLewatApi(el, aksi, id, pesanGagal, ukuran) {
+  const teks = el.innerHTML; el.disabled = true;
+  const berhenti = jalanWaktu(t => { el.innerHTML = `<span class="spinner"></span> Mengunduh${ukuran ? ' ' + ukuranTeks(ukuran) : ''}… ${jamTeks(t)}${t > 20 ? ' · sinyal lemah, mohon tunggu' : ''}`; });
+  const r = await api(aksi, { id }, { batas: 180000 });
+  berhenti(); el.disabled = false; el.innerHTML = teks;
+  if (!r.ok) { toast(r.pesan || pesanGagal, 5000); return; }
+  const bin = atob(r.data.isi), u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([u8], { type: r.data.tipe }));
+  a.download = r.data.nama; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  toast(r.data.nama + ' terunduh. Buka dari folder Download.', 4500);
+}
+
 /* ---------- Kumpulan data turunan ---------- */
 const admin = () => S.sesi && S.sesi.user.peran === 'admin';
 function bisaUbahPeriode(p) {
@@ -2722,7 +2744,9 @@ function viewMenu() {
       ${item('laporan', 'Laporan Excel & ePPGBM', 'Buat dan unduh laporan bulanan', '', 'dokumen', 'hijau')}
       ${item('pengguna', 'Akun kader', 'Tambah, ubah PIN, nonaktifkan', '', 'akun', 'ungu')}
       ${item('kunci', 'Kunci periode', 'Kunci bulan yang sudah dilaporkan', '', 'gembok', 'abu')}
-    </div>` : ''}
+    </div>` : `<div class="judul-sub">Laporan</div><div class="daftar">
+      ${item('laporan', 'Laporan Excel posyandu', 'Buat dan unduh laporan bulanan Posyandu ' + esc(S.sesi.user.posyandu || ''), '', 'dokumen', 'hijau')}
+    </div>`}
     <div class="judul-sub">Panduan</div>
     <div class="daftar">
       ${item('dasar-penilaian', 'Dasar penilaian & sumber', 'Batas Normal/Risiko dan peraturan acuannya', '', 'buku', 'biru')}
@@ -3037,20 +3061,21 @@ function viewLaporan() {
       <label class="isian"><span>Periode</span><select id="perLap">${ps.map((p, i) => `<option value="${p}" ${i === 1 ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>
       <label class="isian"><span>Kelompok sasaran</span><select id="kelLap"><option value="balita">Balita</option><option value="ibu">Ibu hamil, nifas &amp; menyusui</option><option value="remaja">Usia sekolah &amp; remaja 5–17 tahun</option><option value="dewasa">Usia dewasa 18–59 tahun</option><option value="lansia">Lansia</option><option value="">Semua (5 file)</option></select></label>
     </div>
-    <label class="isian"><span>Cakupan</span><select id="posLap"><option value="">Seluruh desa (semua posyandu + TOTAL DESA)</option>${S.d.posyandu.map(p => `<option value="${esc(p)}">Posyandu ${esc(p)} saja</option>`).join('')}</select></label>
+    ${admin() ? `<label class="isian"><span>Cakupan</span><select id="posLap"><option value="">Seluruh desa (semua posyandu + TOTAL DESA)</option>${S.d.posyandu.map(p => `<option value="${esc(p)}">Posyandu ${esc(p)} saja</option>`).join('')}</select></label>`
+      : `<input type="hidden" id="posLap" value=""><div class="pesan-info">Laporan berisi data <b>Posyandu ${esc(S.sesi.user.posyandu || '')}</b> saja. NIK dan No KK disamarkan seperti di aplikasi.</div>`}
     <button class="tombol penuh" data-aksi="buatLaporan">Buat laporan</button>
     <p class="redup kecil">Balita: rekap SKDN, gizi, imunisasi, vitamin A, obat cacing, MP-ASI, KPSP, PD3I. Ibu: ibu hamil, persalinan, nifas, KB, ASI. Lansia: pemeriksaan, skrining, rujukan.
       Robot membuat laporan setiap tanggal 1 dan mengirim tautannya ke email admin. Pembuatan butuh ±1–3 menit per kelompok; kemajuannya tampil setelah tombol ditekan.</p>
     <div id="hasilLap"></div></div>
-    <div class="kartu"><h2>File impor ePPGBM</h2>
+    ${admin() ? `<div class="kartu"><h2>File impor ePPGBM</h2>
     <p class="redup kecil" style="margin-top:0">Data pengukuran dalam format "Format Import Data Pengukuran Balita" ePPGBM. Hanya balita yang sudah ditimbang dan punya NIK 16 angka.</p>
     <div class="grid2">
       <label class="isian"><span>Periode</span><select id="perEp">${ps.map((p, i) => `<option value="${p}" ${i === 0 ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>
       <label class="isian"><span>Posyandu</span><select id="posEp">${S.d.posyandu.map(p => `<option ${(S.pos || S.d.posyandu[0]) === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}<option value="">Semua (1 file)</option></select></label>
     </div>
     <button class="tombol penuh" data-aksi="unduhEppgbm">${ikon('dokumen', 20)} Unduh file ePPGBM</button>
-    <div id="hasilEp"></div></div>
-    <div class="judul-bagian">Laporan tersimpan di Google Drive</div>` + v.html;
+    <div id="hasilEp"></div></div>` : ''}
+    <div class="judul-bagian">${admin() ? 'Laporan tersimpan di Google Drive' : 'Laporan posyandu Anda yang tersimpan'}</div>` + v.html;
   v.setelah = async () => {
     const r = await api('daftarLaporan', {}); const el = $('#isiOnline'); if (!el) return;
     if (!r.ok) return tampilGagal(r);
@@ -3275,14 +3300,24 @@ const AKSI = {
       orang = { balita: 'anak', lansia: 'lansia', ibu: 'ibu', dewasa: 'warga', remaja: 'anak' }[kel] || 'anak';
     if (semua && !pos) { toast('Pilih posyandu dulu di atas daftar.'); return; }
     const teks = el.innerHTML; el.disabled = true;
-    el.innerHTML = `<span class="spinner"></span> ${semua ? `Menyiapkan kartu semua ${{ balita: 'balita', lansia: 'lansia', ibu: 'ibu', dewasa: 'warga usia dewasa', remaja: 'anak/remaja' }[kel]} (1–4 menit)…` : 'Menyiapkan kartu…'}`;
+    // perkiraan waktu dari pengalaman terakhir di HP ini (per kelompok, satu orang / semua), sebelum ada: 30 detik / 3 menit
+    const kunciDurasi = 'durasiKartu:' + kel + (semua ? ':semua' : ''), mulai = Date.now();
+    let perkiraan = 0; try { perkiraan = +localStorage.getItem(kunciDurasi) || 0; } catch (e) { /* penyimpanan tidak tersedia */ }
+    if (!perkiraan) perkiraan = semua ? 180 : 30;
+    const nama = semua ? `kartu semua ${{ balita: 'balita', lansia: 'lansia', ibu: 'ibu', dewasa: 'warga usia dewasa', remaja: 'anak/remaja' }[kel]}` : 'kartu';
+    toast(`Membuat ${nama}: perkiraan ±${lamaTeks(perkiraan)}. Biarkan aplikasi tetap terbuka.`, 5000);
+    const detak = jalanWaktu(t => { el.innerHTML = `<span class="spinner"></span> Menyiapkan ${nama}… ${jamTeks(t)} · ${t < perkiraan - 5 ? 'sisa ±' + lamaTeks(perkiraan - t) : 'hampir selesai…'}`; });
     const r = await api({ balita: 'kartuBantu', lansia: 'kartuBantuLansia', ibu: 'kartuBantuIbu', dewasa: 'kartuBantuDewasa', remaja: 'kartuBantuRemaja' }[kel] || 'kartuBantu', semua ? { posyandu: pos, bagian: +el.dataset.bagian || 1 } : { id: el.dataset.id }, { batas: 330000 });
-    el.disabled = false; el.innerHTML = teks;
+    detak(); el.disabled = false; el.innerHTML = teks;
     if (!r.ok) { toast(r.pesan, 5000); return; }
-    bukaLembar(`<h3>Kartu Bantu siap</h3><div class="redup kecil" style="margin-bottom:12px">${esc(r.data.nama)} · ${r.data.jumlah} ${orang} · tersimpan di folder Drive desa</div>
+    const lama = Math.round((Date.now() - mulai) / 1000);
+    try { localStorage.setItem(kunciDurasi, String(lama)); } catch (e) { /* abaikan */ }
+    bukaLembar(`<h3>Kartu Bantu siap</h3><div class="redup kecil" style="margin-bottom:12px">${esc(r.data.nama)} · ${r.data.jumlah} ${orang} · dibuat dalam ${lamaTeks(lama)}${r.data.ukuran ? ' · ' + ukuranTeks(r.data.ukuran) : ''}</div>
       <div class="pesan-info">Cetak bolak-balik: halaman <b>Depan</b> lalu <b>Belakang</b> untuk setiap ${orang}. Isian yang belum dicatat di aplikasi dibiarkan kosong untuk diisi tangan.</div>
-      <div class="deret-tombol" style="margin-top:12px"><a class="tombol" href="${esc(r.data.unduh)}" target="_blank" rel="noopener">Unduh PDF</a>
-      <a class="tombol garis" href="${esc(r.data.url)}" target="_blank" rel="noopener">Buka di Drive</a></div>
+      <div class="deret-tombol" style="margin-top:12px">${r.data.id ? `<button type="button" class="tombol" data-aksi="unduhKartu" data-id="${esc(r.data.id)}" data-ukuran="${+r.data.ukuran || 0}">Unduh PDF</button>`
+        : `<a class="tombol" href="${esc(r.data.unduh)}" target="_blank" rel="noopener">Unduh PDF</a>`}
+      ${admin() ? `<a class="tombol garis" href="${esc(r.data.url)}" target="_blank" rel="noopener">Buka di Drive</a>` : ''}</div>
+      <p class="redup kecil" style="margin:8px 0 0">Unduhan bisa diulang dalam 6 jam. Setelah itu tekan tombol Kartu Bantu lagi.</p>
       <button type="button" class="tombol garis penuh" style="margin-top:10px" data-aksi="tutup">Tutup</button>`);
   },
   buatLaporan: async el => {
@@ -3293,6 +3328,7 @@ const AKSI = {
     const kunciDurasi = 'durasiLap:' + (kel || 'semua') + (pos ? ':pos' : '');
     let perkiraan = 0; try { perkiraan = +localStorage.getItem(kunciDurasi) || 0; } catch (e) { /* penyimpanan tidak tersedia */ }
     if (!perkiraan) perkiraan = kel === 'balita' ? 150 : kel ? 70 : 360;   // detik, sebelum ada pengalaman
+    toast(`Membuat laporan: perkiraan ±${lamaTeks(perkiraan)}. Biarkan halaman ini terbuka.`, 5000);
     const idProses = 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), mulai = Date.now();
     let srv = null;
     h.innerHTML = `<div class="proses-lap" role="status" aria-live="polite">
@@ -3323,25 +3359,16 @@ const AKSI = {
     if (r.ok) try { localStorage.setItem(kunciDurasi, String(Math.round((Date.now() - mulai) / 1000))); } catch (e) { /* abaikan */ }
     const file = r.ok ? (r.data.file || [{ kelompok: 'Balita', nama: r.data.nama, url: r.data.url, unduh: r.data.unduh }]) : [];
     h.innerHTML = r.ok ? file.map(f => `<div class="pesan-info" style="margin-top:12px"><b>${esc(f.kelompok)}</b> — ${esc(f.nama)} siap (${Math.round((Date.now() - mulai) / 1000)} detik).</div><div class="deret-tombol">
-      <button type="button" class="tombol" data-aksi="unduhLap" data-id="${esc(f.id || '')}" data-unduh="${esc(f.unduh)}">Unduh Excel</button><a class="tombol garis" href="${esc(f.url)}" target="_blank" rel="noopener">Buka di Drive</a></div>`).join('')
+      <button type="button" class="tombol" data-aksi="unduhLap" data-id="${esc(f.id || '')}" data-unduh="${esc(f.unduh)}">Unduh Excel</button>${admin() ? `<a class="tombol garis" href="${esc(f.url)}" target="_blank" rel="noopener">Buka di Drive</a>` : ''}</div>`).join('')
       : `<div class="pesan-galat" style="margin-top:12px">${esc(r.pesan)}</div>`;
   },
   // Unduh laporan lewat API (tanpa login Google di HP); bila server lama belum memberi id, pakai tautan Drive
   unduhLap: async el => {
     const id = el.dataset.id;
     if (!id) { window.open(el.dataset.unduh, '_blank', 'noopener'); return; }
-    const teks = el.innerHTML; el.disabled = true; el.innerHTML = '<span class="spinner"></span> Mengunduh…';
-    const r = await api('unduhLaporan', { id }, { batas: 120000 });
-    el.disabled = false; el.innerHTML = teks;
-    if (!r.ok) { toast(r.pesan || 'Gagal mengunduh laporan.', 5000); return; }
-    const bin = atob(r.data.isi), u8 = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([u8], { type: r.data.tipe }));
-    a.download = r.data.nama; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-    toast(r.data.nama + ' terunduh. Buka dari folder Download.', 4500);
+    await unduhLewatApi(el, 'unduhLaporan', id, 'Gagal mengunduh laporan.');
   },
+  unduhKartu: async el => { await unduhLewatApi(el, 'unduhKartu', el.dataset.id, 'Gagal mengunduh kartu.', +el.dataset.ukuran || 0); },
   unduhEppgbm: async el => {
     const p = $('#perEp').value, pos = $('#posEp').value, h = $('#hasilEp'), teks = el.innerHTML;
     el.disabled = true; el.innerHTML = '<span class="spinner"></span> Menyiapkan file…';
