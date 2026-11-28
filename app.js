@@ -684,16 +684,28 @@ const ukuranTeks = b => b >= 1048576 ? angka(Math.round(b / 104857.6) / 10) + ' 
 /* Panggil f(detik berjalan) sekarang dan tiap detik; kembalikan fungsi penghenti */
 function jalanWaktu(f) { const m = Date.now(), g = () => f((Date.now() - m) / 1000); g(); const t = setInterval(g, 1000); return () => clearInterval(t); }
 /* Berkas Drive desa (laporan, kartu) diambil server sebagai base64: akun kader tidak perlu akses Google Drive */
+/* Diambil per potongan ±1,5 MB (persen tampil), potongan yang putus diulang 3 kali */
 async function unduhLewatApi(el, aksi, id, pesanGagal, ukuran) {
   const teks = el.innerHTML; el.disabled = true;
-  const berhenti = jalanWaktu(t => { el.innerHTML = `<span class="spinner"></span> Mengunduh${ukuran ? ' ' + ukuranTeks(ukuran) : ''}… ${jamTeks(t)}${t > 20 ? ' · sinyal lemah, mohon tunggu' : ''}`; });
-  const r = await api(aksi, { id }, { batas: 180000 });
+  let ke = 0, jumlah = 0, coba = 0;
+  const berhenti = jalanWaktu(t => { el.innerHTML = `<span class="spinner"></span> Mengunduh${ukuran ? ' ' + ukuranTeks(ukuran) : ''}${jumlah ? ' · ' + Math.round(ke / jumlah * 100) + '%' : ''}… ${jamTeks(t)}${coba ? ' · mengulang (sinyal lemah)' : t > 20 ? ' · mohon tunggu' : ''}`; });
+  const potong = []; let r = null;
+  while (!jumlah || ke < jumlah) {
+    r = await api(aksi, { id, bagian: ke }, { batas: 90000 });
+    if (!r.ok) { if (r.jaringan && coba < 3) { coba++; continue; } break; }
+    coba = 0; jumlah = r.data.jumlah || 1; ukuran = r.data.ukuran || ukuran;
+    potong.push(r.data.isi); ke++;
+  }
   berhenti(); el.disabled = false; el.innerHTML = teks;
-  if (!r.ok) { toast(r.pesan || pesanGagal, 5000); return; }
-  const bin = atob(r.data.isi), u8 = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  if (!r || !r.ok) {
+    bukaLembar(`<h3>Unduhan gagal</h3><div class="pesan-galat">${esc((r && r.pesan) || pesanGagal)}</div>
+      <p class="redup kecil">${jumlah ? `Terhenti di potongan ${ke + 1} dari ${jumlah}. ` : ''}Pastikan sinyal stabil lalu tekan Unduh lagi. Bila tetap gagal, sampaikan pesan ini ke admin desa (aplikasi versi ${esc(C.VERSI)}).</p>
+      <button type="button" class="tombol penuh" data-aksi="tutup">Tutup</button>`);
+    return;
+  }
+  const bagian = potong.map(isi => { const bin = atob(isi), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return u8; });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([u8], { type: r.data.tipe }));
+  a.href = URL.createObjectURL(new Blob(bagian, { type: r.data.tipe }));
   a.download = r.data.nama; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 60000);
   toast(r.data.nama + ' terunduh. Buka dari folder Download.', 4500);
