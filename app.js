@@ -48,9 +48,13 @@ function rapiHP(s) {
   return n.replace(/\D/g, '');
 }
 /* '8,5' / '8.5' / '8,5 kg' → 8.5; kosong → ''; bukan angka → NaN */
+/* Angka dari isian kader: '8,5' '8.5' '8,' (koma belum diisi) ',5' '10 ,5' '8,5 kg', angka & koma Arab dari keyboard tertentu */
 function bacaAngka(v) {
-  const s = String(v === null || v === undefined ? '' : v).trim().replace(/\s*(kg|cm|gram|g)$/i, '').replace(',', '.');
+  let s = String(v === null || v === undefined ? '' : v).trim().replace(/\s*(kg|cm|gram|g)$/i, '')
+    .replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[\u066B\u201A]/g, ',').replace(/\s+/g, '').replace(',', '.');
   if (!s) return '';
+  if (/^\.\d+$/.test(s)) s = '0' + s;
+  if (/^\d+\.$/.test(s)) s = s.slice(0, -1);
   return /^\d+(\.\d+)?$/.test(s) ? parseFloat(s) : NaN;
 }
 /* Berat lahir dalam gram: '3200', '3.200' (titik ribuan) dan '3,2' (kg) → 3200 */
@@ -842,7 +846,7 @@ function viewLogin() {
       <h2>Masuk ke akun Anda</h2>
       ${S.galatLogin ? `<div class="pesan-awas">${esc(S.galatLogin)}</div>` : ''}
       <form id="fLogin" autocomplete="on">
-        <label class="isian"><span>Username</span><input name="username" autocapitalize="none" autocomplete="username" required></label>
+        <label class="isian"><span>Username</span><input name="username" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" required></label>
         <label class="isian"><span>PIN</span><input name="pin" type="password" inputmode="numeric" enterkeyhint="next" autocomplete="current-password" required></label>
         <div id="galat"></div>
         <button class="tombol penuh" type="submit">Masuk</button>
@@ -856,13 +860,17 @@ function viewLogin() {
 }
 
 async function kirimLogin(f) {
-  const tombol = f.querySelector('button[type=submit]');
+  const tombol = f.querySelector('button[type=submit]'), gagal = pesan => { $('#galat').innerHTML = `<div class="pesan-galat">${esc(pesan)}</div>`; tombol.disabled = false; tombol.textContent = 'Masuk'; };
   tombol.disabled = true; tombol.innerHTML = '<span class="spinner"></span> Masuk…';
-  const r = await api('login', { username: f.username.value.trim().toLowerCase(), pin: f.pin.value.trim(), perangkat: navigator.userAgent.slice(0, 100) });
-  if (!r.ok) { $('#galat').innerHTML = `<div class="pesan-galat">${esc(r.pesan)}</div>`; tombol.disabled = false; tombol.textContent = 'Masuk'; return; }
-  const lama = await DB.get('sesi');
-  S.sesi = { token: r.data.token, user: r.data.user, kedaluwarsa: r.data.kedaluwarsa };
-  await DB.set('sesi', S.sesi);
+  // spasi dibuang: "lestari 1" = "lestari1" (keyboard HP juga sering menambah spasi di akhir kata)
+  const r = await api('login', { username: f.username.value.replace(/\s+/g, '').toLowerCase(), pin: f.pin.value.replace(/\s+/g, ''), perangkat: navigator.userAgent.slice(0, 100) });
+  if (!r.ok) { gagal(r.pesan); return; }
+  let lama = null;
+  try {
+    lama = await DB.get('sesi');
+    S.sesi = { token: r.data.token, user: r.data.user, kedaluwarsa: r.data.kedaluwarsa };
+    await DB.set('sesi', S.sesi);
+  } catch (e) { S.sesi = null; gagal('Penyimpanan HP tidak bisa dipakai (mode penyamaran atau memori penuh). Buka aplikasi di jendela biasa lalu coba lagi.'); return; }
   S.galatLogin = '';
   if (S.dasar && lama && lama.user && lama.user.username !== r.data.user.username) { S.dasar = null; await DB.del('dasar'); }
   location.hash = '#/beranda';
@@ -3065,12 +3073,16 @@ function viewPersetujuan() {
   return v;
 }
 
+/* Bulan laporan: dari bulan pertama aplikasi dipakai (sebelumnya tidak ada data) sampai bulan berjalan; bertambah sendiri tiap bulan */
+const PERIODE_AWAL_LAPORAN = '2026-11';
+function periodeLaporan() { const out = []; for (let p = periodeKini(); p >= PERIODE_AWAL_LAPORAN && out.length < 60; p = geserPeriode(p, -1)) out.push(p); return out.length ? out : [periodeKini()]; }
 function viewLaporan() {
-  const ps = []; for (let i = 0; i < 24; i++) ps.push(geserPeriode(periodeKini(), -i));
+  const ps = periodeLaporan(), pilihAwal = Math.min(1, ps.length - 1);   // bawaan: bulan lalu (sudah lengkap), atau bulan berjalan bila baru satu bulan
+  const opsiBulan = pilih => ps.map((p, i) => `<option value="${p}" ${i === pilih ? 'selected' : ''}>${namaPeriode(p)}${i === 0 ? ' (bulan berjalan)' : ''}</option>`).join('');
   const v = perluSinyal('Laporan Excel', 'menu');
   v.html = `<div class="kartu"><h2>Buat laporan bulanan</h2>
     <div class="grid2">
-      <label class="isian"><span>Periode</span><select id="perLap">${ps.map((p, i) => `<option value="${p}" ${i === 1 ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>
+      <label class="isian"><span>Periode</span><select id="perLap">${opsiBulan(pilihAwal)}</select></label>
       <label class="isian"><span>Kelompok sasaran</span><select id="kelLap"><option value="balita">Balita</option><option value="ibu">Ibu hamil, nifas &amp; menyusui</option><option value="remaja">Usia sekolah &amp; remaja 5–17 tahun</option><option value="dewasa">Usia dewasa 18–59 tahun</option><option value="lansia">Lansia</option><option value="">Semua (5 file)</option></select></label>
     </div>
     ${admin() ? `<label class="isian"><span>Cakupan</span><select id="posLap"><option value="">Seluruh desa (semua posyandu + TOTAL DESA)</option>${S.d.posyandu.map(p => `<option value="${esc(p)}">Posyandu ${esc(p)} saja</option>`).join('')}</select></label>`
@@ -3082,7 +3094,7 @@ function viewLaporan() {
     ${admin() ? `<div class="kartu"><h2>File impor ePPGBM</h2>
     <p class="redup kecil" style="margin-top:0">Data pengukuran dalam format "Format Import Data Pengukuran Balita" ePPGBM. Hanya balita yang sudah ditimbang dan punya NIK 16 angka.</p>
     <div class="grid2">
-      <label class="isian"><span>Periode</span><select id="perEp">${ps.map((p, i) => `<option value="${p}" ${i === 0 ? 'selected' : ''}>${namaPeriode(p)}</option>`).join('')}</select></label>
+      <label class="isian"><span>Periode</span><select id="perEp">${opsiBulan(0)}</select></label>
       <label class="isian"><span>Posyandu</span><select id="posEp">${S.d.posyandu.map(p => `<option ${(S.pos || S.d.posyandu[0]) === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}<option value="">Semua (1 file)</option></select></label>
     </div>
     <button class="tombol penuh" data-aksi="unduhEppgbm">${ikon('dokumen', 20)} Unduh file ePPGBM</button>
